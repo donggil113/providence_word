@@ -1,0 +1,95 @@
+// 섭리 말씀 아카이브 데이터 모델
+// PostgreSQL + Prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// 말씀의 종류
+enum Category {
+  SUNDAY              // 주일말씀
+  WEDNESDAY           // 수요말씀
+  DAWN                // 새벽말씀
+  FRIDAY_PRAYER       // 금요기도회
+  HOLY_SPIRIT_MEETING // 성령집회 말씀
+  DEPARTMENT          // 부서 말씀
+  SPECIAL             // 특별 말씀
+  ETC                 // 기타 말씀
+  HOLY_SPIRIT_STORY   // 성령사연
+  BIBLE_SCHOOL        // 성경학교
+  THEOLOGY            // 신학
+}
+
+enum FileKind {
+  TXT
+  PDF
+  HWP
+  OTHER
+}
+
+enum Role {
+  ADMIN  // 모든 권한 + 계정 관리
+  EDITOR // 말씀 등록/수정/삭제
+}
+
+model Sermon {
+  id          String   @id @default(cuid())
+  title       String                       // 제목
+  category    Category                     // 말씀 종류
+  department  String?                      // 부서명 (부서 말씀일 때)
+  eventName   String?                      // 행사명 (성령집회/특별집회 등)
+  preacher    String?                      // 설교자
+  scripture   String?                      // 성경 본문 (예: 창세기 1:1-5)
+  summary     String?                      // 요약 / 설명
+  contentText String?                      // 검색용 본문 텍스트(txt/pdf에서 자동 추출)
+  preachedAt  DateTime                     // 선포된 날짜
+  year        Int                          // 선포 연도 (연도별 정렬/필터용, preachedAt 에서 파생)
+
+  files     SermonFile[]
+  createdBy String?
+  creator   User?        @relation(fields: [createdBy], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([preachedAt])
+  @@index([category])
+  @@index([year])
+  @@index([department])
+  @@map("sermons")
+}
+
+model SermonFile {
+  id           String   @id @default(cuid())
+  sermon       Sermon   @relation(fields: [sermonId], references: [id], onDelete: Cascade)
+  sermonId     String
+  originalName String                      // 원본 파일명
+  storedName   String                      // 디스크에 저장된 파일명 (충돌 방지용 고유명)
+  kind         FileKind                    // 파일 종류
+  mimeType     String
+  size         Int                         // 바이트
+  createdAt    DateTime @default(now())
+
+  @@index([sermonId])
+  @@map("sermon_files")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String
+  passwordHash String
+  role         Role     @default(EDITOR)
+  active       Boolean  @default(true)
+
+  sermons   Sermon[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("users")
+}
