@@ -9,11 +9,12 @@
 
 ## 주요 기능
 
-- **말씀 종류별 분류** — 주일말씀 · 수요말씀 · 새벽말씀 · 금요기도회 · 성령집회 말씀 ·
-  부서 말씀 · 특별 말씀 · 기타 말씀 · 성령사연 · 성경학교 · 신학
+- **말씀 종류별 분류** — 기본 11종(주일·수요·새벽·금요기도회·성령집회·부서·특별·기타·성령사연·성경학교·신학)
+  외에 **관리자가 직접 분류를 추가·수정** (관리 → 분류 관리)
 - **시간 순 정리** — 연도별 보기, 최신순/오래된순 정렬
 - **강력한 검색** — 제목·성경본문·설교자·행사명·부서, 그리고 **txt/pdf 본문 내용**까지 검색
 - **기간 선택** — 특정 기간 내에 선포된 말씀만 모아보기
+- **말씀 상세 보기** — **‘말씀 내용 보기’ 탭**(추출 본문)과 **‘PDF 원문 보기’ 탭**(원문 PDF를 브라우저에서 바로 표시)
 - **다양한 파일 지원** — `txt`, `pdf`, `hwp(hwpx)` 업로드 및 보기/다운로드
 - **모바일·데스크톱 모두 지원** — 반응형 디자인
 - **매주 손쉬운 추가** — 로그인한 관리자/편집자가 관리자 페이지에서 말씀 등록
@@ -127,19 +128,21 @@ npx tsx scripts/import.ts --csv data/sermons.csv --base data/files
 
 ### PDF 자동 분석(수백~수천 개 일괄)
 
-직접 CSV를 만들기 어려운 대량 PDF는 **자동 분석 파이프라인**을 쓰세요. PDF 본문을
-추출(스캔본은 한국어 OCR)하고 제목·날짜·분류 등을 자동으로 채운 **검토용 CSV**를 만든 뒤,
-사람이 확인·수정하고 등록합니다.
+직접 CSV를 만들기 어려운 대량 PDF는 **규칙 기반 자동 분석 파이프라인**을 쓰세요(AI 호출 없음).
+PDF 본문을 추출(스캔본은 한국어 OCR)하고 **파일명 앞부분 숫자(YYMMDD/YYYYMMDD)로 날짜**,
+**파일명·상위 폴더명 키워드로 분류**를 자동으로 채운 **검토용 CSV**를 만든 뒤, 사람이 확인·수정하고 등록합니다.
 
 ```bash
-# 1) 먼저 샘플 15개로 정확도 확인 → 2) 전체 분석 → (검토) → 3) 등록
-npx tsx scripts/analyze.ts --dir ./pdfs --out data/sermons.generated.csv --limit 15
+# 1) 먼저 샘플 30개로 확인 → 2) 전체 분석 → (검토) → 3) 등록(원본 PDF 첨부)
+npx tsx scripts/analyze.ts --dir ./pdfs --out data/sermons.generated.csv --limit 30
 npx tsx scripts/analyze.ts --dir ./pdfs --out data/sermons.generated.csv
 npx tsx scripts/import.ts  --csv data/sermons.generated.csv
 ```
 
-전체 절차·옵션·OCR 설치·비용 안내는 **[docs/bulk-import.md](docs/bulk-import.md)** 를 참고하세요.
-(정확한 자동 분류를 원하면 `ANTHROPIC_API_KEY` 설정 — 없으면 규칙 기반으로 동작.)
+- 날짜·분류를 규칙으로 못 잡은 파일은 `확인필요`로 표시되어 `*.needs-review.csv` 로 분리됩니다.
+- 설교자·요약까지 AI로 보정하려면 `ANTHROPIC_API_KEY` 설정 후 `--llm` 옵션을 추가하세요(이때만 AI 호출).
+
+전체 절차·옵션·OCR 설치는 **[docs/bulk-import.md](docs/bulk-import.md)** 를 참고하세요.
 
 ---
 

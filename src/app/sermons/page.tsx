@@ -9,8 +9,8 @@ import {
 import SearchForm from "@/components/SearchForm";
 import SermonCard from "@/components/SermonCard";
 import Pagination from "@/components/Pagination";
-import { categoryLabel, isCategory } from "@/lib/categories";
-import { Category } from "@prisma/client";
+import { listCategories } from "@/lib/category-store";
+import { CategoryLite } from "@/lib/categories";
 
 export const dynamic = "force-dynamic";
 
@@ -42,17 +42,20 @@ export default async function SermonsPage({ searchParams }: PageProps) {
   let result: Awaited<ReturnType<typeof searchSermons>> | null = null;
   let years: number[] = [];
   let departments: string[] = [];
+  let categories: CategoryLite[] = [];
   let dbError = false;
 
   try {
-    const [r, yf, dl] = await Promise.all([
+    const [r, yf, dl, cl] = await Promise.all([
       searchSermons(query),
       yearFacets(),
       departmentList(),
+      listCategories(),
     ]);
     result = r;
     years = yf.map((y) => y.year);
     departments = dl;
+    categories = cl;
   } catch (e) {
     dbError = true;
     console.error("말씀 검색 실패:", e);
@@ -61,8 +64,10 @@ export default async function SermonsPage({ searchParams }: PageProps) {
   // 현재 활성화된 필터 요약
   const activeFilters: string[] = [];
   if (query.q) activeFilters.push(`"${query.q}"`);
-  if (query.category && isCategory(query.category))
-    activeFilters.push(categoryLabel(query.category as Category));
+  const activeCat = query.category
+    ? categories.find((c) => c.code === query.category)
+    : undefined;
+  if (activeCat) activeFilters.push(activeCat.label);
   if (query.department) activeFilters.push(query.department);
   if (query.year) activeFilters.push(`${query.year}년`);
   if (query.from || query.to)
@@ -82,7 +87,7 @@ export default async function SermonsPage({ searchParams }: PageProps) {
     <div className="mx-auto max-w-6xl px-4 py-6">
       <h1 className="text-xl font-bold text-slate-900 mb-4">말씀 검색</h1>
 
-      <SearchForm years={years} departments={departments} />
+      <SearchForm years={years} departments={departments} categories={categories} />
 
       {dbError ? (
         <div className="mt-6 rounded-lg border border-amber-300 bg-amber-50 p-4 text-amber-800 text-sm">

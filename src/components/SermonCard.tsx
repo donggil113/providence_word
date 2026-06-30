@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Category, FileKind } from "@prisma/client";
+import { FileKind } from "@prisma/client";
 import CategoryBadge from "./CategoryBadge";
 import { FILE_KIND_LABELS } from "@/lib/categories";
 import { formatDate } from "@/lib/format";
@@ -7,7 +7,7 @@ import { formatDate } from "@/lib/format";
 export interface SermonCardData {
   id: string;
   title: string;
-  category: Category;
+  category: { code: string; label: string; color: string } | null;
   department: string | null;
   eventName: string | null;
   preacher: string | null;
@@ -25,7 +25,7 @@ export default function SermonCard({ sermon }: { sermon: SermonCardData }) {
       className="block rounded-xl border border-slate-200 bg-white p-4 hover:border-brand-400 hover:shadow-sm transition"
     >
       <div className="flex items-center gap-2 flex-wrap mb-1.5">
-        <CategoryBadge category={sermon.category} />
+        {sermon.category && <CategoryBadge category={sermon.category} />}
         {sermon.department && (
           <span className="text-xs text-slate-500">· {sermon.department}</span>
         )}

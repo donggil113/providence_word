@@ -24,15 +24,42 @@ import "dotenv/config";
 import { promises as fs } from "fs";
 import path from "path";
 import crypto from "crypto";
-import { PrismaClient, Category, FileKind } from "@prisma/client";
+import { PrismaClient, FileKind } from "@prisma/client";
 import { extractContent } from "../src/lib/extract";
+import { normalizeCode } from "../src/lib/categories";
 
 const prisma = new PrismaClient();
 
-const VALID_CATEGORIES = new Set<string>([
-  "SUNDAY", "WEDNESDAY", "DAWN", "FRIDAY_PRAYER", "HOLY_SPIRIT_MEETING",
-  "DEPARTMENT", "SPECIAL", "ETC", "HOLY_SPIRIT_STORY", "BIBLE_SCHOOL", "THEOLOGY",
-]);
+// 자동 생성 시 보기 좋은 기본 라벨(코드 → 한글). 없으면 코드를 라벨로 사용.
+const KNOWN_LABELS: Record<string, string> = {
+  PASTORAL: "교역자 말씀",
+  EDUCATION: "교육 말씀",
+};
+
+// 분류 코드 → categoryId 캐시. 없는 코드는 사용자 정의 분류로 자동 생성한다.
+const categoryIdCache = new Map<string, string>();
+async function resolveCategoryId(rawCode: string): Promise<string> {
+  const code = normalizeCode(rawCode) || "ETC";
+  const cached = categoryIdCache.get(code);
+  if (cached) return cached;
+  let cat = await prisma.category.findUnique({ where: { code } });
+  if (!cat) {
+    // CSV 에 새 분류 코드가 있으면 자동 생성(관리자가 나중에 라벨/색 수정 가능)
+    const max = await prisma.category.aggregate({ _max: { sortOrder: true } });
+    cat = await prisma.category.create({
+      data: {
+        code,
+        label: KNOWN_LABELS[code] || rawCode.trim() || code,
+        color: "teal",
+        sortOrder: (max._max.sortOrder ?? 0) + 10,
+        isBuiltin: false,
+      },
+    });
+    console.log(`  + 새 분류 자동 생성: ${code} (${cat.label})`);
+  }
+  categoryIdCache.set(code, cat.id);
+  return cat.id;
+}
 
 function arg(name: string, fallback?: string): string | undefined {
   const i = process.argv.indexOf(`--${name}`);
@@ -114,11 +141,10 @@ async function main() {
       if (!rec.preachedAt || !rec.title || !rec.category) {
         throw new Error("preachedAt/title/category 누락");
       }
-      if (!VALID_CATEGORIES.has(rec.category)) {
-        throw new Error(`알 수 없는 category: ${rec.category}`);
-      }
       const preachedAt = new Date(rec.preachedAt);
       if (isNaN(preachedAt.getTime())) throw new Error(`잘못된 날짜: ${rec.preachedAt}`);
+      // 분류 코드 → categoryId (없는 코드는 자동 생성)
+      const categoryId = await resolveCategoryId(rec.category);
 
       // 파일 처리
       const filePaths = (rec.files || "")
@@ -149,7 +175,7 @@ async function main() {
       await prisma.sermon.create({
         data: {
           title: rec.title,
-          category: rec.category as Category,
+          categoryId,
           department: rec.department || null,
           eventName: rec.eventName || null,
           preacher: rec.preacher || null,

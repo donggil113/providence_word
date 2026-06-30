@@ -1,8 +1,7 @@
 import "server-only";
 import { z } from "zod";
-import { Category } from "@prisma/client";
 import { prisma } from "@/lib/db";
-import { isCategory, fileKindFromName } from "@/lib/categories";
+import { fileKindFromName } from "@/lib/categories";
 import { extractContent } from "@/lib/extract";
 import { makeStoredName, saveFile, deleteStoredFile } from "@/lib/files";
 
@@ -10,9 +9,7 @@ const MAX_FILE_BYTES = 50 * 1024 * 1024; // 파일당 50MB
 
 const metaSchema = z.object({
   title: z.string().trim().min(1, "제목을 입력하세요.").max(500),
-  category: z
-    .string()
-    .refine((v) => isCategory(v), { message: "올바른 말씀 종류가 아닙니다." }),
+  category: z.string().trim().min(1, "말씀 종류를 선택하세요."), // 분류 코드
   department: z.string().trim().max(200).optional().nullable(),
   eventName: z.string().trim().max(300).optional().nullable(),
   preacher: z.string().trim().max(200).optional().nullable(),
@@ -98,6 +95,13 @@ function guessMime(name: string): string {
 
 export class ValidationError extends Error {}
 
+// 분류 코드 → categoryId (없으면 오류)
+async function resolveCategoryId(code: string): Promise<string> {
+  const cat = await prisma.category.findUnique({ where: { code } });
+  if (!cat) throw new ValidationError(`존재하지 않는 말씀 종류입니다: ${code}`);
+  return cat.id;
+}
+
 export async function createSermon(form: FormData, userId: string) {
   const parsed = metaSchema.safeParse({
     title: form.get("title"),
@@ -114,6 +118,7 @@ export async function createSermon(form: FormData, userId: string) {
   }
   const data = parsed.data;
 
+  const categoryId = await resolveCategoryId(data.category);
   const files = await collectFiles(form);
   const contentText = await buildContentText(files);
   const preachedAt = new Date(data.preachedAt);
@@ -121,7 +126,7 @@ export async function createSermon(form: FormData, userId: string) {
   const sermon = await prisma.sermon.create({
     data: {
       title: data.title,
-      category: data.category as Category,
+      categoryId,
       department: data.department || null,
       eventName: data.eventName || null,
       preacher: data.preacher || null,
@@ -194,12 +199,13 @@ export async function updateSermon(id: string, form: FormData) {
     contentText = parts.join("\n\n").trim();
   }
 
+  const categoryId = await resolveCategoryId(data.category);
   const preachedAt = new Date(data.preachedAt);
   const sermon = await prisma.sermon.update({
     where: { id },
     data: {
       title: data.title,
-      category: data.category as Category,
+      categoryId,
       department: data.department || null,
       eventName: data.eventName || null,
       preacher: data.preacher || null,

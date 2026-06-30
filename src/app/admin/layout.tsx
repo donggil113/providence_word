@@ -23,6 +23,11 @@ export default async function AdminLayout({
             새 말씀 등록
           </Link>
           {user.role === "ADMIN" && (
+            <Link href="/admin/categories" className="rounded-lg px-3 py-1.5 hover:bg-slate-100">
+              분류 관리
+            </Link>
+          )}
+          {user.role === "ADMIN" && (
             <Link href="/admin/users" className="rounded-lg px-3 py-1.5 hover:bg-slate-100">
               계정 관리
             </Link>

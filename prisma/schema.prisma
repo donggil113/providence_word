@@ -10,19 +10,21 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// 말씀의 종류
-enum Category {
-  SUNDAY              // 주일말씀
-  WEDNESDAY           // 수요말씀
-  DAWN                // 새벽말씀
-  FRIDAY_PRAYER       // 금요기도회
-  HOLY_SPIRIT_MEETING // 성령집회 말씀
-  DEPARTMENT          // 부서 말씀
-  SPECIAL             // 특별 말씀
-  ETC                 // 기타 말씀
-  HOLY_SPIRIT_STORY   // 성령사연
-  BIBLE_SCHOOL        // 성경학교
-  THEOLOGY            // 신학
+// 말씀의 종류 — 사용자가 직접 추가/수정할 수 있도록 테이블로 관리한다.
+// (기본 11종은 seed 로 생성되며 isBuiltin=true. 그 외 분류는 관리자가 추가)
+model Category {
+  id        String   @id @default(cuid())
+  code      String   @unique // 식별 코드(영문/대문자, CSV·필터에 사용)
+  label     String // 화면 표시명(한글)
+  color     String   @default("slate") // 뱃지 색상(팔레트 이름, lib/categories.ts 의 PALETTE)
+  sortOrder Int      @default(100) // 표시 순서
+  isBuiltin Boolean  @default(false) // 기본 분류(삭제 불가)
+  sermons   Sermon[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([sortOrder])
+  @@map("categories")
 }
 
 enum FileKind {
@@ -40,7 +42,8 @@ enum Role {
 model Sermon {
   id          String   @id @default(cuid())
   title       String                       // 제목
-  category    Category                     // 말씀 종류
+  categoryId  String                       // 말씀 종류 (Category 참조)
+  category    Category @relation(fields: [categoryId], references: [id])
   department  String?                      // 부서명 (부서 말씀일 때)
   eventName   String?                      // 행사명 (성령집회/특별집회 등)
   preacher    String?                      // 설교자
@@ -58,7 +61,7 @@ model Sermon {
   updatedAt DateTime @updatedAt
 
   @@index([preachedAt])
-  @@index([category])
+  @@index([categoryId])
   @@index([year])
   @@index([department])
   @@map("sermons")

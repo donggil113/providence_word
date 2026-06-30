@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { CATEGORY_OPTIONS, FILE_KIND_LABELS } from "@/lib/categories";
+import { CategoryLite, FILE_KIND_LABELS } from "@/lib/categories";
 import { formatBytes } from "@/lib/format";
 
 export interface ExistingFile {
@@ -25,12 +25,20 @@ export interface SermonInitial {
   files?: ExistingFile[];
 }
 
-export default function SermonForm({ initial }: { initial?: SermonInitial }) {
+export default function SermonForm({
+  initial,
+  categories,
+}: {
+  initial?: SermonInitial;
+  categories: CategoryLite[];
+}) {
   const router = useRouter();
   const isEdit = Boolean(initial?.id);
 
   const [title, setTitle] = useState(initial?.title || "");
-  const [category, setCategory] = useState(initial?.category || "SUNDAY");
+  const [category, setCategory] = useState(
+    initial?.category || categories[0]?.code || ""
+  );
   const [preachedAt, setPreachedAt] = useState(initial?.preachedAt || "");
   const [scripture, setScripture] = useState(initial?.scripture || "");
   const [preacher, setPreacher] = useState(initial?.preacher || "");
@@ -111,9 +119,9 @@ export default function SermonForm({ initial }: { initial?: SermonInitial }) {
             onChange={(e) => setCategory(e.target.value)}
             className={`mt-1 ${inputCls}`}
           >
-            {CATEGORY_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
+            {categories.map((c) => (
+              <option key={c.code} value={c.code}>
+                {c.label}
               </option>
             ))}
           </select>

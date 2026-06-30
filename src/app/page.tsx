@@ -1,26 +1,24 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
-import { searchSermons, yearFacets, categoryFacets, departmentList } from "@/lib/sermons";
+import { searchSermons, yearFacets, departmentList } from "@/lib/sermons";
+import { categoryCounts } from "@/lib/category-store";
 import SearchForm from "@/components/SearchForm";
 import SermonCard from "@/components/SermonCard";
-import { CATEGORY_ORDER, categoryLabel } from "@/lib/categories";
 
 export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
   let total = 0;
   let years: { year: number; count: number }[] = [];
-  let cats: { category: string; count: number }[] = [];
-  let departments: string[] = [];
+  let cats: Awaited<ReturnType<typeof categoryCounts>> = [];
   let recent: Awaited<ReturnType<typeof searchSermons>>["items"] = [];
   let dbError = false;
 
   try {
-    [total, years, cats, departments] = await Promise.all([
+    [total, years, cats] = await Promise.all([
       prisma.sermon.count(),
       yearFacets(),
-      categoryFacets() as any,
-      departmentList(),
+      categoryCounts(),
     ]);
     const result = await searchSermons({ perPage: "6" });
     recent = result.items;
@@ -28,8 +26,6 @@ export default async function HomePage() {
     dbError = true;
     console.error("홈 데이터 로딩 실패:", e);
   }
-
-  const catCount = new Map(cats.map((c) => [c.category, c.count]));
 
   return (
     <div>
@@ -44,7 +40,7 @@ export default async function HomePage() {
             연도별·부서별·행사별로 정리된 말씀을 날짜, 기간, 키워드로 찾아보세요.
           </p>
           <div className="mt-6 max-w-2xl mx-auto">
-            <SearchForm years={[]} departments={[]} compact />
+            <SearchForm years={[]} departments={[]} categories={[]} compact />
           </div>
           {total > 0 && (
             <p className="mt-3 text-brand-200 text-sm">
@@ -65,15 +61,15 @@ export default async function HomePage() {
         <section>
           <h2 className="text-lg font-bold text-slate-900 mb-3">말씀 종류</h2>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
-            {CATEGORY_ORDER.map((c) => (
+            {cats.map((c) => (
               <Link
-                key={c}
-                href={`/sermons?category=${c}`}
+                key={c.code}
+                href={`/sermons?category=${c.code}`}
                 className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-4 py-3 hover:border-brand-400 hover:shadow-sm transition"
               >
-                <span className="font-medium text-slate-800">{categoryLabel(c)}</span>
+                <span className="font-medium text-slate-800">{c.label}</span>
                 <span className="text-sm text-slate-400">
-                  {(catCount.get(c) || 0).toLocaleString()}
+                  {c.count.toLocaleString()}
                 </span>
               </Link>
             ))}

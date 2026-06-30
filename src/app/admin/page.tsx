@@ -58,7 +58,7 @@ export default async function AdminDashboard({
             <div key={s.id} className="flex items-center gap-3 p-3 hover:bg-slate-50">
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <CategoryBadge category={s.category} />
+                  {s.category && <CategoryBadge category={s.category} />}
                   <span className="text-xs text-slate-400">{formatDate(s.preachedAt)}</span>
                   {s.department && (
                     <span className="text-xs text-slate-400">· {s.department}</span>

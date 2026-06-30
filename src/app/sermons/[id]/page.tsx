@@ -5,6 +5,7 @@ import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import CategoryBadge from "@/components/CategoryBadge";
 import DeleteSermonButton from "@/components/DeleteSermonButton";
+import SermonTabs from "@/components/SermonTabs";
 import { FILE_KIND_LABELS } from "@/lib/categories";
 import { formatDate, formatBytes } from "@/lib/format";
 
@@ -14,7 +15,11 @@ async function getSermon(id: string) {
   try {
     return await prisma.sermon.findUnique({
       where: { id },
-      include: { files: { orderBy: { createdAt: "asc" } }, creator: { select: { name: true } } },
+      include: {
+        files: { orderBy: { createdAt: "asc" } },
+        creator: { select: { name: true } },
+        category: { select: { code: true, label: true, color: true } },
+      },
     });
   } catch {
     return null;
@@ -56,7 +61,7 @@ export default async function SermonDetailPage({
 
       <article className="mt-3 rounded-xl border border-slate-200 bg-white p-5 sm:p-7">
         <div className="flex items-center gap-2 flex-wrap">
-          <CategoryBadge category={sermon.category} />
+          {sermon.category && <CategoryBadge category={sermon.category} />}
           <span className="text-sm text-slate-400 ml-auto">
             {formatDate(sermon.preachedAt)}
           </span>
@@ -122,17 +127,13 @@ export default async function SermonDetailPage({
           </section>
         )}
 
-        {/* 본문 미리보기(검색용 추출 텍스트) */}
-        {sermon.contentText && (
-          <details className="mt-6 group">
-            <summary className="cursor-pointer text-sm font-semibold text-slate-700 select-none">
-              본문 내용 보기
-            </summary>
-            <div className="mt-3 max-h-[60vh] overflow-y-auto rounded-lg border border-slate-200 bg-white p-4 text-sm text-slate-800 prose-keep">
-              {sermon.contentText}
-            </div>
-          </details>
-        )}
+        {/* 말씀 내용 보기 / PDF 원문 보기 탭 */}
+        <SermonTabs
+          contentText={sermon.contentText}
+          pdfs={sermon.files
+            .filter((f) => f.kind === "PDF")
+            .map((f) => ({ id: f.id, originalName: f.originalName }))}
+        />
 
         {/* 관리자/편집자 액션 */}
         {user && (

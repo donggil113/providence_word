@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import SermonForm, { SermonInitial } from "@/components/SermonForm";
+import { listCategories } from "@/lib/category-store";
 import { toInputDate } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
@@ -12,16 +13,22 @@ export default async function EditSermonPage({
 }: {
   params: { id: string };
 }) {
-  const sermon = await prisma.sermon.findUnique({
-    where: { id: params.id },
-    include: { files: { orderBy: { createdAt: "asc" } } },
-  });
+  const [sermon, categories] = await Promise.all([
+    prisma.sermon.findUnique({
+      where: { id: params.id },
+      include: {
+        files: { orderBy: { createdAt: "asc" } },
+        category: { select: { code: true } },
+      },
+    }),
+    listCategories(),
+  ]);
   if (!sermon) notFound();
 
   const initial: SermonInitial = {
     id: sermon.id,
     title: sermon.title,
-    category: sermon.category,
+    category: sermon.category?.code,
     department: sermon.department,
     eventName: sermon.eventName,
     preacher: sermon.preacher,
@@ -39,7 +46,7 @@ export default async function EditSermonPage({
   return (
     <div className="max-w-3xl">
       <h1 className="text-xl font-bold text-slate-900 mb-4">말씀 수정</h1>
-      <SermonForm initial={initial} />
+      <SermonForm initial={initial} categories={categories} />
     </div>
   );
 }

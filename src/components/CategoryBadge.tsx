@@ -1,12 +1,17 @@
-import { Category } from "@prisma/client";
-import { CATEGORY_COLORS, categoryLabel } from "@/lib/categories";
+import { paletteStyle } from "@/lib/categories";
 
-export default function CategoryBadge({ category }: { category: Category }) {
+export interface BadgeCategory {
+  label: string;
+  color: string;
+}
+
+export default function CategoryBadge({ category }: { category: BadgeCategory }) {
   return (
     <span
-      className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-medium ${CATEGORY_COLORS[category]}`}
+      className="inline-block rounded-full px-2.5 py-0.5 text-xs font-medium"
+      style={paletteStyle(category.color)}
     >
-      {categoryLabel(category)}
+      {category.label}
     </span>
   );
 }

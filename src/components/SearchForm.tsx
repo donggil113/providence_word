@@ -2,16 +2,17 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useEffect } from "react";
-import { CATEGORY_OPTIONS } from "@/lib/categories";
+import { CategoryLite } from "@/lib/categories";
 
 interface Props {
   years: number[];
   departments: string[];
+  categories: CategoryLite[];
   // 컴팩트 모드(홈 화면용): 키워드 + 검색 버튼만
   compact?: boolean;
 }
 
-export default function SearchForm({ years, departments, compact = false }: Props) {
+export default function SearchForm({ years, departments, categories, compact = false }: Props) {
   const router = useRouter();
   const params = useSearchParams();
 
@@ -101,9 +102,9 @@ export default function SearchForm({ years, departments, compact = false }: Prop
           aria-label="말씀 종류"
         >
           <option value="">전체 종류</option>
-          {CATEGORY_OPTIONS.map((o) => (
-            <option key={o.value} value={o.value}>
-              {o.label}
+          {categories.map((c) => (
+            <option key={c.code} value={c.code}>
+              {c.label}
             </option>
           ))}
         </select>

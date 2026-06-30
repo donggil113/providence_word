@@ -1,6 +1,5 @@
-import { Prisma, Category } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
-import { isCategory } from "@/lib/categories";
 
 export interface SermonQuery {
   q?: string; // 키워드
@@ -14,8 +13,15 @@ export interface SermonQuery {
   sort?: string; // 'desc' (최신순) | 'asc' (오래된순)
 }
 
+export type SermonListItem = Prisma.SermonGetPayload<{
+  include: {
+    files: true;
+    category: { select: { code: true; label: true; color: true } };
+  };
+}>;
+
 export interface SermonSearchResult {
-  items: Awaited<ReturnType<typeof prisma.sermon.findMany>>;
+  items: SermonListItem[];
   total: number;
   page: number;
   perPage: number;
@@ -54,8 +60,9 @@ export function buildWhere(query: SermonQuery): Prisma.SermonWhereInput {
     });
   }
 
-  if (query.category && isCategory(query.category)) {
-    where.category = query.category as Category;
+  // 분류 코드로 필터(관계 필터)
+  if (query.category?.trim()) {
+    where.category = { code: query.category.trim() };
   }
 
   if (query.department?.trim()) {
@@ -99,6 +106,7 @@ export async function searchSermons(
       take: perPage,
       include: {
         files: { orderBy: { createdAt: "asc" } },
+        category: { select: { code: true, label: true, color: true } },
       },
     }),
   ]);
@@ -122,16 +130,7 @@ export async function yearFacets(): Promise<{ year: number; count: number }[]> {
   return rows.map((r) => ({ year: r.year, count: r._count._all }));
 }
 
-// 종류별 개수
-export async function categoryFacets(): Promise<
-  { category: Category; count: number }[]
-> {
-  const rows = await prisma.sermon.groupBy({
-    by: ["category"],
-    _count: { _all: true },
-  });
-  return rows.map((r) => ({ category: r.category, count: r._count._all }));
-}
+// (분류별 개수는 lib/category-store.ts 의 categoryCounts 사용)
 
 // 부서 목록(부서 필터용)
 export async function departmentList(): Promise<string[]> {
