@@ -125,6 +125,22 @@ npx tsx scripts/import.ts --csv data/sermons.csv --base data/files
 - `files` 는 `--base` 경로 기준 상대경로이며 여러 개는 `;` 로 구분합니다.
 - 자세한 형식은 [`data/sermons.example.csv`](data/sermons.example.csv) 와 `scripts/import.ts` 상단 주석 참고.
 
+### PDF 자동 분석(수백~수천 개 일괄)
+
+직접 CSV를 만들기 어려운 대량 PDF는 **자동 분석 파이프라인**을 쓰세요. PDF 본문을
+추출(스캔본은 한국어 OCR)하고 제목·날짜·분류 등을 자동으로 채운 **검토용 CSV**를 만든 뒤,
+사람이 확인·수정하고 등록합니다.
+
+```bash
+# 1) 먼저 샘플 15개로 정확도 확인 → 2) 전체 분석 → (검토) → 3) 등록
+npx tsx scripts/analyze.ts --dir ./pdfs --out data/sermons.generated.csv --limit 15
+npx tsx scripts/analyze.ts --dir ./pdfs --out data/sermons.generated.csv
+npx tsx scripts/import.ts  --csv data/sermons.generated.csv
+```
+
+전체 절차·옵션·OCR 설치·비용 안내는 **[docs/bulk-import.md](docs/bulk-import.md)** 를 참고하세요.
+(정확한 자동 분류를 원하면 `ANTHROPIC_API_KEY` 설정 — 없으면 규칙 기반으로 동작.)
+
 ---
 
 ## 도메인 연결 & HTTPS

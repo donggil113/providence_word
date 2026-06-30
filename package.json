@@ -12,7 +12,9 @@
     "db:push": "prisma db push",
     "db:setup-search": "tsx scripts/setup-search.ts",
     "db:seed": "tsx prisma/seed.ts",
-    "db:init": "prisma db push && tsx scripts/setup-search.ts && tsx prisma/seed.ts"
+    "db:init": "prisma db push && tsx scripts/setup-search.ts && tsx prisma/seed.ts",
+    "analyze": "tsx scripts/analyze.ts",
+    "import": "tsx scripts/import.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
@@ -30,6 +32,7 @@
     "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@anthropic-ai/sdk": "^0.69.0",
     "@types/bcryptjs": "^2.4.6",
     "@types/node": "^20.16.11",
     "@types/react": "^18.3.11",
@@ -37,6 +40,7 @@
     "autoprefixer": "^10.4.20",
     "eslint": "^8.57.1",
     "eslint-config-next": "14.2.15",
+    "pdf-lib": "^1.17.1",
     "postcss": "^8.4.47",
     "prisma": "^5.22.0",
     "tailwindcss": "^3.4.13",

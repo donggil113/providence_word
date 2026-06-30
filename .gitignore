@@ -23,6 +23,12 @@ next-env.d.ts
 # prisma
 /prisma/*.db
 
+# bulk-import working files
+/.analyze-cache/
+/fixtures-pdfs/
+/data/*.generated.csv
+/data/*.needs-ocr.txt
+
 # misc
 .DS_Store
 *.pem
@@ -32,3 +38,7 @@ yarn-error.log*
 /coverage
 .vscode/
 .idea/
+
+# typescript incremental build info
+tsconfig.tsbuildinfo
+*.tsbuildinfo

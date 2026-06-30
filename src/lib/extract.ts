@@ -19,14 +19,27 @@ function decodeText(buf: Buffer): string {
 
 async function extractPdf(buf: Buffer): Promise<string> {
   try {
-    // pdf-parse 는 패키지 루트 import 시 테스트 파일을 읽으려 하므로
-    // 내부 모듈을 직접 require 하고, 실패해도 검색 본문 없이 진행한다.
+    // pdf-parse 가 함께 번들하는 최신 pdf.js(v2.0.550)를 직접 사용한다.
+    // pdf-parse 의 기본 엔진(pdf.js v1.10)은 일부 정상 PDF의 xref도
+    // 거부하는 버그가 있어, 더 견고한 v2 엔진으로 텍스트 레이어를 읽는다.
     // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const pdfParse = require("pdf-parse/lib/pdf-parse.js");
-    const data = await pdfParse(buf);
-    return (data.text || "").trim();
+    const pdfjs = require("pdf-parse/lib/pdf.js/v2.0.550/build/pdf.js");
+    const doc = await pdfjs.getDocument({
+      data: new Uint8Array(buf),
+      disableFontFace: true,
+      // 콘솔 잡음 억제
+      verbosity: 0,
+    }).promise;
+    const maxPages = Math.min(doc.numPages, 500);
+    const parts: string[] = [];
+    for (let i = 1; i <= maxPages; i++) {
+      const page = await doc.getPage(i);
+      const tc = await page.getTextContent();
+      parts.push(tc.items.map((it: any) => it.str).join(" "));
+    }
+    return parts.join("\n").trim();
   } catch (e) {
-    console.warn("PDF 텍스트 추출 실패(검색 본문 없이 저장합니다):", e);
+    console.warn("PDF 텍스트 추출 실패(검색 본문 없이 저장합니다):", (e as Error).message);
     return "";
   }
 }
