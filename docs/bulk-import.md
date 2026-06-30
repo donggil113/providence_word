@@ -18,11 +18,14 @@ PDF 폴더 ──①분석──▶ 검토용 CSV ──(사람이 검토·수�
 ## 0. 준비
 
 ```bash
-npm install
+npm install        # @anthropic-ai/sdk 는 정식 의존성이라 함께 설치됩니다
 
 # (선택) 더 정확한 자동 분류를 위해 Claude API 키 설정
 export ANTHROPIC_API_KEY=sk-ant-...
 #   키가 없으면 파일명·본문 키워드 기반의 '규칙 기반' 모드로 동작합니다(정확도↓).
+#   docker 컨테이너에서 실행할 때는 키를 컨테이너로 전달해야 합니다:
+#     docker compose exec -e ANTHROPIC_API_KEY=sk-ant-... web npx tsx scripts/analyze.ts --dir ...
+#   또는 .env 에 ANTHROPIC_API_KEY 를 추가(스크립트가 dotenv 로 읽음).
 
 # (권장) 스캔(이미지) PDF의 한국어 OCR을 위한 도구
 sudo apt-get install -y tesseract-ocr tesseract-ocr-kor poppler-utils
@@ -85,6 +88,18 @@ npx tsx scripts/analyze.ts --dir ./pdfs --out data/sermons.generated.csv
   npx tsx scripts/analyze.ts --dir ./pdfs --out data/sermons.generated.csv --model claude-haiku-4-5
   ```
 - 키가 없으면 자동으로 규칙 기반 모드가 됩니다(무료, 대신 분류·요약 정확도는 낮습니다).
+
+### LLM 연결 점검(빠른 실패)
+
+키가 설정된 경우, 본격 처리 전에 **시작 단계에서 Claude에 한 번 시험 호출**해 연결을 확인합니다.
+
+- `LLM 점검 : 연결 확인 중... OK ✓` 가 보이면 정상입니다.
+- SDK 미설치/키 누락/연결 실패 시에는 **즉시 중단(exit 1)** 하고 원인을 안내합니다.
+  (예전처럼 조용히 규칙 기반으로 바뀌어 `LLM실패` 로 잘못 표시되지 않습니다.)
+- 일부러 규칙 기반으로 돌리려면 `--no-llm` 을 붙이세요.
+
+> 개별 문서에서만 일시적 오류가 나면 1회 재시도 후, 그 행의 `review_reason` 에
+> 실제 오류 메시지(`LLM오류:...`)가 기록되어 어떤 문서가 왜 실패했는지 알 수 있습니다.
 
 ---
 

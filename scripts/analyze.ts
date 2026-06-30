@@ -274,30 +274,86 @@ ${CATEGORIES.map((c) => `  - ${c.code}: ${c.label}`).join("\n")}
 - 본문이 비어 있거나 OCR 품질이 낮으면 추정 가능한 항목만 채우고 needsReview=true.
 - 확실하지 않은 값은 지어내지 말고 빈 문자열로 두세요.`;
 
+// LLM 초기화(모듈 로드/키 확인) 단계의 오류 — 시작 시 한 번에 잡아 명확히 안내한다.
+class LlmInitError extends Error {}
+
 let anthropicClient: any = null;
 function getClient(): any {
   if (anthropicClient) return anthropicClient;
-  // 지연 로드 (LLM 미사용 시 불필요)
-  const Anthropic = require("@anthropic-ai/sdk");
-  const Ctor = Anthropic.default || Anthropic.Anthropic || Anthropic;
-  anthropicClient = new Ctor();
+
+  // 1) SDK 모듈 로드
+  let mod: any;
+  try {
+    mod = require("@anthropic-ai/sdk");
+  } catch (e) {
+    throw new LlmInitError(
+      `@anthropic-ai/sdk 모듈을 불러올 수 없습니다. 의존성이 설치되지 않았을 수 있습니다.\n` +
+        `    해결: 프로젝트 루트에서  npm install  (운영 컨테이너라면 devDependencies 제외 설치인지 확인)\n` +
+        `    원인: ${(e as Error).message.split("\n")[0]}`
+    );
+  }
+  const Ctor = mod.default || mod.Anthropic || mod;
+
+  // 2) API 키 확인 (SDK는 키가 없어도 생성은 되지만 호출 시 실패하므로 미리 검증)
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const authToken = process.env.ANTHROPIC_AUTH_TOKEN;
+  if (!apiKey && !authToken) {
+    throw new LlmInitError(
+      `ANTHROPIC_API_KEY 가 설정되지 않았습니다.\n` +
+        `    해결: export ANTHROPIC_API_KEY=sk-ant-...  또는 프로젝트 .env 에 추가\n` +
+        `    (도커라면 컨테이너 환경변수로 전달했는지 확인:  -e ANTHROPIC_API_KEY=... )`
+    );
+  }
+
+  // 3) 클라이언트 생성 (키를 명시적으로 전달 — 전달 경로를 분명히 한다)
+  try {
+    anthropicClient = new Ctor(apiKey ? { apiKey } : { authToken });
+  } catch (e) {
+    throw new LlmInitError(`Anthropic 클라이언트 생성 실패: ${(e as Error).message.split("\n")[0]}`);
+  }
   return anthropicClient;
+}
+
+// 시작 시 1회: 키/모델/연결을 실제 호출로 검증(빠른 실패).
+async function probeLlm(opts: Options): Promise<void> {
+  const client = getClient();
+  await client.messages.create({
+    model: opts.model,
+    max_tokens: 8,
+    messages: [{ role: "user", content: "ping" }],
+  });
 }
 
 async function llmMeta(opts: Options, fileName: string, text: string): Promise<Meta> {
   const client = getClient();
   const userContent = `[파일명]\n${fileName}\n\n[본문 발췌]\n${text.slice(0, 8000) || "(본문 없음)"}`;
 
-  const resp = await client.messages.create({
-    model: opts.model,
-    max_tokens: 1500,
-    output_config: {
-      format: { type: "json_schema", name: "sermon_metadata", schema: SCHEMA },
-      effort: opts.effort,
-    },
-    system: SYSTEM_PROMPT,
-    messages: [{ role: "user", content: userContent }],
-  });
+  let resp: any;
+  let lastErr: any;
+  // 일시적 오류(네트워크/429/5xx) 대비 1회 재시도
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      resp = await client.messages.create({
+        model: opts.model,
+        max_tokens: 1500,
+        output_config: {
+          format: { type: "json_schema", name: "sermon_metadata", schema: SCHEMA },
+          effort: opts.effort,
+        },
+        system: SYSTEM_PROMPT,
+        messages: [{ role: "user", content: userContent }],
+      });
+      lastErr = null;
+      break;
+    } catch (e) {
+      lastErr = e;
+      const status = (e as any)?.status;
+      // 인증/요청 오류(4xx, 단 429 제외)는 재시도 무의미 → 즉시 중단
+      if (status && status !== 429 && status < 500) break;
+      await new Promise((r) => setTimeout(r, 800 * (attempt + 1)));
+    }
+  }
+  if (lastErr) throw lastErr;
 
   if (resp.stop_reason === "refusal") {
     throw new Error("LLM 거부됨(refusal)");
@@ -397,10 +453,13 @@ async function processPdf(opts: Options, pdfPath: string): Promise<{ row?: RowRe
     try {
       meta = await llmMeta(opts, fileName, text);
     } catch (e) {
-      console.warn(`  ⚠ LLM 실패(${fileName}) → 규칙 기반으로 대체: ${(e as Error).message}`);
+      // 시작 시 probeLlm 으로 모듈/키/연결은 이미 검증되었으므로, 여기 도달하면
+      // 특정 문서에 대한 일시적/개별적 오류다. 실제 오류 메시지를 기록한다.
+      const msg = ((e as Error).message || "오류").split("\n")[0].slice(0, 80);
+      console.warn(`  ⚠ LLM 개별 오류(${fileName}) → 규칙 기반 대체: ${msg}`);
       meta = heuristicMeta(fileName, text);
       meta.needsReview = true;
-      meta.reviewReason = (meta.reviewReason ? meta.reviewReason + "," : "") + "LLM실패";
+      meta.reviewReason = (meta.reviewReason ? meta.reviewReason + "," : "") + `LLM오류:${msg}`;
     }
   } else {
     meta = heuristicMeta(fileName, text);
@@ -521,6 +580,22 @@ async function main() {
   console.log(`  OCR 도구  : ${ocrAvailable ? `사용 가능 (${opts.ocrLang})` : "없음 → 스캔 PDF는 '처리불가 목록'으로 분리"}`);
   if (!ocrAvailable && opts.ocrMode !== "off") {
     console.log("    스캔 PDF OCR을 원하면: sudo apt-get install -y tesseract-ocr tesseract-ocr-kor poppler-utils");
+  }
+
+  // LLM 사용 시: 모듈/키/연결을 시작 단계에서 실제 호출로 검증(빠른 실패).
+  // (예전엔 문서마다 조용히 실패해 'LLM실패'로 잘못 표시되었음)
+  if (opts.useLlm) {
+    process.stdout.write("  LLM 점검  : 연결 확인 중...");
+    try {
+      await probeLlm(opts);
+      console.log(" OK ✓");
+    } catch (e) {
+      console.log(" 실패 ✗");
+      const msg = e instanceof LlmInitError ? (e as Error).message : `API 호출 실패: ${(e as Error).message.split("\n")[0]}`;
+      console.error("\n✗ Claude API를 사용할 수 없습니다:\n  " + msg);
+      console.error("\n  키/설치 문제를 해결한 뒤 다시 실행하거나, 규칙 기반으로 진행하려면 --no-llm 을 붙이세요.");
+      process.exit(1);
+    }
   }
 
   let pdfs = await findPdfs(opts.dir);

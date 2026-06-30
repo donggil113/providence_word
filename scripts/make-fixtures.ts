@@ -75,10 +75,14 @@ async function main() {
     "It has enough characters to count as a real document.";
 
   const files: { name: string; bytes: Buffer }[] = [
+    // 분류/날짜가 서로 다른 텍스트 PDF (AI/규칙 분류 검증용)
     { name: "1995-03-05_주일말씀_생명의빛.pdf", bytes: textPdf("Date 1995-03-05\n" + body) },
-    { name: "20240815_여름성령집회_성령의불.pdf", bytes: textPdf("Date 2024-08-15\n" + body) },
-    { name: "청년부_특강_믿음으로.pdf", bytes: textPdf(body) }, // 날짜 없음
-    { name: "2001_새벽말씀_scanned.pdf", bytes: imageOnlyPdf() }, // 스캔 흉내(텍스트 없음)
+    { name: "2003-11-12_수요말씀_기도의능력.pdf", bytes: textPdf("Date 2003-11-12\n" + body) },
+    { name: "2010-01-01_신년특별예배_새해의소망.pdf", bytes: textPdf("Date 2010-01-01\n" + body) },
+    { name: "2015-07-20_여름성령집회_성령의불.pdf", bytes: textPdf("Date 2015-07-20\n" + body) },
+    { name: "2018-06-10_청년부_믿음으로.pdf", bytes: textPdf("Date 2018-06-10\n" + body) },
+    // 텍스트 없는 스캔 흉내 (OCR/처리불가 경로용) — 정렬상 마지막에 오도록 zz_ 접두
+    { name: "zz_2001_새벽말씀_scanned.pdf", bytes: imageOnlyPdf() },
   ];
 
   for (const f of files) {
