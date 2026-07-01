@@ -15,6 +15,7 @@ export async function GET(req: NextRequest) {
     year: sp.get("year") ?? undefined,
     from: sp.get("from") ?? undefined,
     to: sp.get("to") ?? undefined,
+    needsReview: sp.get("needsReview") ?? undefined,
     page: sp.get("page") ?? undefined,
     perPage: sp.get("perPage") ?? undefined,
     sort: sp.get("sort") ?? undefined,

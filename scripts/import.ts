@@ -172,10 +172,13 @@ async function main() {
         });
       }
 
+      // 자동 분석에서 '검토필요' 로 표시된 행은 DB에도 needsReview=true 로 남긴다.
+      const needsReview = /검토필요|확인필요|true|1/i.test(rec.needs_review || "");
       await prisma.sermon.create({
         data: {
           title: rec.title,
           categoryId,
+          needsReview,
           department: rec.department || null,
           eventName: rec.eventName || null,
           preacher: rec.preacher || null,

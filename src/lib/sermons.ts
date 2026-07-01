@@ -8,6 +8,7 @@ export interface SermonQuery {
   year?: string; // 연도
   from?: string; // 기간 시작 (YYYY-MM-DD)
   to?: string; // 기간 끝 (YYYY-MM-DD)
+  needsReview?: string; // '1' 이면 검토필요만
   page?: string;
   perPage?: string;
   sort?: string; // 'desc' (최신순) | 'asc' (오래된순)
@@ -63,6 +64,11 @@ export function buildWhere(query: SermonQuery): Prisma.SermonWhereInput {
   // 분류 코드로 필터(관계 필터)
   if (query.category?.trim()) {
     where.category = { code: query.category.trim() };
+  }
+
+  // 검토필요만
+  if (query.needsReview === "1") {
+    where.needsReview = true;
   }
 
   if (query.department?.trim()) {
