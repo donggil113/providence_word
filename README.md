@@ -101,6 +101,11 @@ npm run dev
 | `npm run db:setup-search` | pg_trgm 확장 + 검색 인덱스 생성 |
 | `npm run db:seed` | 최초 관리자 계정 생성 |
 | `npm run db:init` | 위 3개를 한 번에 |
+| `npm run db:migrate-category` | 기존 DB의 분류 enum → 테이블 **무손실 마이그레이션** |
+
+> **이미 말씀이 등록된 DB가 있다면**(분류가 아직 enum 컬럼): `prisma db push` 가 리셋을
+> 요구할 수 있습니다. 데이터를 잃지 않고 옮기려면 **[docs/migrate-existing-db.md](docs/migrate-existing-db.md)**
+> 의 안내(`npm run db:migrate-category`)를 따르세요.
 
 ---
 

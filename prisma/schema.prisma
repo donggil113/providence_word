@@ -43,7 +43,7 @@ model Sermon {
   id          String   @id @default(cuid())
   title       String                       // 제목
   categoryId  String                       // 말씀 종류 (Category 참조)
-  category    Category @relation(fields: [categoryId], references: [id])
+  category    Category @relation(fields: [categoryId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   department  String?                      // 부서명 (부서 말씀일 때)
   eventName   String?                      // 행사명 (성령집회/특별집회 등)
   preacher    String?                      // 설교자
