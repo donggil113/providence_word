@@ -63,6 +63,22 @@ npx prisma db execute --file prisma/migrations/manual/001_category_enum_to_table
 psql "$DATABASE_URL" -f prisma/migrations/manual/001_category_enum_to_table.sql
 ```
 
+## 본문 텍스트 청소 (선택)
+
+PDF/HWP에서 추출된 본문에 원본 파일의 **머리말/꼬리말**(예: `120260621 …교육 말씀.hwp - 1 -`)이
+섞여 들어간 경우, 저장된 `contentText` 만 청소하는 일회성 스크립트가 있습니다.
+(제목·날짜·분류 등 다른 필드는 건드리지 않으며, 멱등이라 중단·재실행이 안전합니다.)
+
+```bash
+# 1) 미리보기(쓰기 없음) — 몇 건이 바뀌는지 + 예시 확인
+npx tsx scripts/clean-content.ts --dry-run --show 5
+# 2) 실제 적용
+npm run db:clean-content
+```
+
+앞으로 새로 업로드/일괄등록하는 자료는 추출 단계에서 자동으로 청소됩니다
+(`src/lib/extract.ts` 의 `cleanBodyText`).
+
 ## 마이그레이션 후
 
 - 옛 enum 값과 새 분류의 매핑은 코드가 동일합니다(주일말씀=SUNDAY 등)이라 그대로 이어집니다.

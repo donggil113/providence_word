@@ -102,6 +102,7 @@ npm run dev
 | `npm run db:seed` | 최초 관리자 계정 생성 |
 | `npm run db:init` | 위 3개를 한 번에 |
 | `npm run db:migrate-category` | 기존 DB의 분류 enum → 테이블 **무손실 마이그레이션** |
+| `npm run db:clean-content` | 저장된 본문의 파일명/페이지 머리말·꼬리말 잔재 청소 (`--dry-run` 먼저) |
 
 > **이미 말씀이 등록된 DB가 있다면**(분류가 아직 enum 컬럼): `prisma db push` 가 리셋을
 > 요구할 수 있습니다. 데이터를 잃지 않고 옮기려면 **[docs/migrate-existing-db.md](docs/migrate-existing-db.md)**

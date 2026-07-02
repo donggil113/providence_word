@@ -13,6 +13,7 @@
     "db:setup-search": "tsx scripts/setup-search.ts",
     "db:seed": "tsx prisma/seed.ts",
     "db:migrate-category": "tsx scripts/migrate-category.ts",
+    "db:clean-content": "tsx scripts/clean-content.ts",
     "db:init": "prisma db push && tsx scripts/setup-search.ts && tsx prisma/seed.ts",
     "analyze": "tsx scripts/analyze.ts",
     "import": "tsx scripts/import.ts"
