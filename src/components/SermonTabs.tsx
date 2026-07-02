@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import PdfViewer from "./PdfViewer";
 
 export interface PdfFile {
   id: string;
@@ -89,21 +90,12 @@ export default function SermonTabs({
                   ))}
                 </div>
               )}
-              <iframe
-                src={`/api/files/${activePdf}`}
-                className="h-[80vh] w-full rounded-lg border border-slate-200 bg-slate-100"
-                title="PDF 원문"
+              <PdfViewer
+                key={activePdf}
+                url={`/api/files/${activePdf}`}
+                downloadUrl={`/api/files/${activePdf}?download=1`}
+                fileName={pdfs.find((p) => p.id === activePdf)?.originalName}
               />
-              <div className="mt-2 text-right">
-                <a
-                  href={`/api/files/${activePdf}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-sm text-brand-600 hover:underline"
-                >
-                  새 창에서 열기 ↗
-                </a>
-              </div>
             </>
           ) : (
             <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-8 text-center text-sm text-slate-500">

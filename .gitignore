@@ -42,3 +42,6 @@ yarn-error.log*
 # typescript incremental build info
 tsconfig.tsbuildinfo
 *.tsbuildinfo
+
+# generated: pdfjs worker copied into public
+/public/pdf.worker.min.mjs
