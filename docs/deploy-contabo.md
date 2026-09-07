@@ -134,7 +134,7 @@ cd providence_word
 cp .env.example .env
 
 # 비밀번호/시크릿 생성 (아래 두 값을 복사해 두세요)
-openssl rand -base64 32   # ← POSTGRES_PASSWORD 용
+openssl rand -hex 24      # ← POSTGRES_PASSWORD 용 (영문+숫자만 나옵니다)
 openssl rand -base64 48   # ← AUTH_SECRET 용
 
 nano .env
@@ -160,8 +160,11 @@ UPLOAD_DIR=/app/uploads
 ```
 
 - `DATABASE_URL` 의 비밀번호는 `POSTGRES_PASSWORD` 와 **똑같아야** 합니다. 호스트는 `db` 그대로 두세요.
-- 비밀번호에 `@ : / ?` 같은 기호가 들어가면 URL 이 깨집니다. 위 `openssl` 결과에 그런 문자가
-  있으면 다시 생성하거나 영문+숫자로만 만드세요.
+- ⚠️ **DB 비밀번호는 반드시 영문+숫자만** 쓰세요(`openssl rand -hex 24`). `/ + = @ : ?` 가 들어가면
+  URL 이 깨져서 `invalid port number in database URL` 오류가 납니다. (`rand -base64` 결과에는
+  이런 문자가 자주 섞입니다.)
+- ⚠️ `ACME_EMAIL` 은 **실제로 쓰는 이메일**이어야 합니다. `example.com` 같은 예시 도메인을 그대로
+  두면 Let's Encrypt 가 `contact email has forbidden domain` 오류로 인증서 발급을 거부합니다.
 - `ADMIN_EMAIL` / `ADMIN_PASSWORD` 는 **계정이 하나도 없을 때만** 쓰입니다.
   백업을 복원하면 기존 계정과 비밀번호가 그대로 살아나므로 신경 쓰지 않아도 됩니다.
 
@@ -248,12 +251,29 @@ https://providence-word.com
 
 ### 잘 안 될 때
 
-| 증상 | 확인 |
+| 증상 | 원인 · 확인 |
 | --- | --- |
-| 접속 자체가 안 됨 | `nslookup providence-word.com` 이 서버 IP 인지, `ufw status` 에 80/443 이 있는지 |
-| 인증서 발급 실패 | Cloudflare 프록시가 **회색 구름**인지 (2번), `pw logs caddy` 의 오류 메시지 |
-| 502 Bad Gateway | `pw logs web` — DB 접속 실패면 `.env` 의 `DATABASE_URL` 비밀번호 확인 |
+| 브라우저 `ERR_NAME_NOT_RESOLVED` | **DNS 문제**입니다. Cloudflare 에 A 레코드가 없거나 아직 전파 전. `dig +short providence-word.com` 이 서버 IP 를 돌려주는지 확인 |
+| 접속은 되는데 인증서 오류 | Cloudflare 프록시가 **회색 구름**인지 (2번), `pw logs caddy` 확인 |
+| `contact email has forbidden domain` | `.env` 의 `ACME_EMAIL` 이 `example.com` 그대로임. 실제 이메일로 바꾸고 `pw up -d` |
+| `invalid port number in database URL` | DB 비밀번호에 `/ + = @` 등이 섞여 URL 이 깨진 것. 아래 "DB 비밀번호 바꾸기" 참고 |
+| 502 Bad Gateway | `pw logs web` 확인. 대개 위 `DATABASE_URL` 문제 |
 | 말씀이 0편 | 6번 복원을 건너뛴 경우. `pw down`(**`-v` 금지**) 후 6번부터 다시 |
+
+### DB 비밀번호 바꾸기 (URL 이 깨졌을 때)
+
+`POSTGRES_PASSWORD` 는 DB 를 처음 만들 때만 적용되므로, `.env` 만 고치면 실제 DB 비밀번호와
+어긋납니다. DB 안의 비밀번호도 같이 바꿔야 합니다.
+
+```bash
+pw stop web caddy
+
+NEWPW=$(openssl rand -hex 24) && echo "$NEWPW"
+pw exec -T db sh -c "psql -U \$POSTGRES_USER -d \$POSTGRES_DB -c \"ALTER USER \$POSTGRES_USER WITH PASSWORD '$NEWPW';\""
+
+nano .env    # POSTGRES_PASSWORD 와 DATABASE_URL 의 비밀번호를 위 값으로 교체
+pw up -d
+```
 
 ---
 
