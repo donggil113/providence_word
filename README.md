@@ -103,10 +103,55 @@ npm run dev
 | `npm run db:init` | 위 3개를 한 번에 |
 | `npm run db:migrate-category` | 기존 DB의 분류 enum → 테이블 **무손실 마이그레이션** |
 | `npm run db:clean-content` | 저장된 본문의 파일명/페이지 머리말·꼬리말 잔재 청소 (`--dry-run` 먼저) |
+| `npm run admin:reset -- --list` | 등록된 계정(이메일) 목록 확인 |
+| `npm run admin:reset -- --email <이메일>` | 관리자 **비밀번호 초기화** (아래 참고) |
 
 > **이미 말씀이 등록된 DB가 있다면**(분류가 아직 enum 컬럼): `prisma db push` 가 리셋을
 > 요구할 수 있습니다. 데이터를 잃지 않고 옮기려면 **[docs/migrate-existing-db.md](docs/migrate-existing-db.md)**
 > 의 안내(`npm run db:migrate-category`)를 따르세요.
+
+---
+
+## 로그인 이메일·비밀번호를 잊었을 때
+
+관리자 계정은 이메일 발송 기능이 없어 "비밀번호 찾기" 메일을 보낼 수 없습니다.
+대신 **서버에 접속할 수 있는 사람**이 직접 복구합니다. (그래서 서버 접근 권한 자체가 보안 경계입니다.)
+
+```bash
+# ── docker compose 로 운영 중일 때 (Contabo 등 VPS) ──────────
+cd /경로/providence_word
+
+# 1) 어떤 이메일이 등록돼 있는지 확인
+docker compose exec web npx tsx scripts/reset-admin.ts --list
+
+# 2) 비밀번호 초기화 — 비밀번호를 생략하면 임시 비밀번호를 만들어 화면에 보여줍니다
+docker compose exec web npx tsx scripts/reset-admin.ts --email admin@providence.word.net
+
+#    직접 정하고 싶다면 (8자 이상)
+docker compose exec web npx tsx scripts/reset-admin.ts \
+  --email admin@providence.word.net --password '새로운비밀번호'
+
+# 3) 계정이 아예 하나도 없다면 새로 만들기
+docker compose exec web npx tsx scripts/reset-admin.ts \
+  --email 나의메일@example.com --name 관리자 --create
+```
+
+Docker 없이 직접 실행 중이라면 `npx tsx` 부분만 그대로, 프로젝트 폴더에서 실행하면 됩니다.
+
+```bash
+npm run admin:reset -- --list
+npm run admin:reset -- --email admin@providence.word.net
+```
+
+> ⚠️ **`npm run db:seed` 를 다시 돌려도 비밀번호는 초기화되지 않습니다.**
+> 운영 중에 실수로 비밀번호가 바뀌는 것을 막으려고, 시드는 계정이 이미 있으면
+> 비밀번호를 덮어쓰지 않도록 만들어져 있습니다. 초기화는 위 `reset-admin` 을 쓰세요.
+
+**이메일도 기억나지 않는다면** `--list` 출력에 등록된 계정이 모두 나옵니다.
+그래도 안 보이면 `.env` 의 `ADMIN_EMAIL` 값이 최초 생성에 쓰인 이메일입니다.
+
+초기화한 뒤에는 로그인 → **관리 → 계정 관리**에서 원하는 비밀번호로 바꿔 두세요.
+임시 비밀번호는 터미널 기록(`~/.bash_history`)에 남을 수 있습니다.
 
 ---
 
