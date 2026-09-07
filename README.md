@@ -200,41 +200,22 @@ npx tsx scripts/import.ts  --csv data/sermons.generated.csv
 
 ---
 
-## 도메인 연결 & HTTPS
+## 서버 배포 · 도메인 연결 & HTTPS
 
-`www.providence.word.net` 같은 주소로 공개하려면, 도메인을 서버 IP 로 연결한 뒤
-앞단에 리버스 프록시(HTTPS 종료)를 두는 것을 권장합니다.
+VPS(Contabo 등)에 올려 도메인으로 공개하려면 운영용 설정을 함께 사용합니다.
+`Caddy` 리버스 프록시가 붙어 **인증서가 자동 발급·갱신**되고, 웹·DB 포트는 외부에 열리지 않습니다.
 
-### 예시: Caddy (자동 HTTPS)
-
-서버에 Caddy 를 설치하고 `Caddyfile` 을 아래처럼 작성하면 인증서가 자동 발급됩니다.
-
-```
-www.providence.word.net {
-    reverse_proxy localhost:3000
-}
-providence.word.net {
-    redir https://www.providence.word.net{uri}
-}
+```bash
+# .env 에 SITE_DOMAIN / ACME_EMAIL / NEXT_PUBLIC_SITE_URL 을 채운 뒤
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 ```
 
-### 예시: Nginx
+- DNS: 도메인의 A 레코드(`@`, `www`)를 서버 공인 IP 로 지정합니다.
+- Cloudflare 를 쓴다면 인증서 발급 전까지는 **DNS only(회색 구름)** 로 두고,
+  프록시를 켤 때는 SSL/TLS 모드를 **Full (strict)** 로 설정하세요.
 
-```nginx
-server {
-    server_name www.providence.word.net;
-    client_max_body_size 60M;   # 큰 말씀 파일 업로드 대비
-    location / {
-        proxy_pass http://localhost:3000;
-        proxy_set_header Host $host;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-}
-# 인증서는 certbot 등으로 발급 (sudo certbot --nginx -d www.providence.word.net)
-```
-
-> DNS: 도메인의 A 레코드를 서버 공인 IP 로 지정하세요.
+기존 로컬 데이터를 서버로 옮기는 것까지 포함한 전체 절차는
+**[docs/deploy-contabo.md](docs/deploy-contabo.md)** 를 따라 하시면 됩니다.
 
 ---
 
