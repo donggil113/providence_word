@@ -103,6 +103,7 @@ npm run dev
 | `npm run db:init` | 위 3개를 한 번에 |
 | `npm run db:migrate-category` | 기존 DB의 분류 enum → 테이블 **무손실 마이그레이션** |
 | `npm run db:clean-content` | 저장된 본문의 파일명/페이지 머리말·꼬리말 잔재 청소 (`--dry-run` 먼저) |
+| `npm run category:add -- --list` | 말씀 종류(분류) 목록 확인 · `--label`/`--code` 로 추가 |
 | `npm run admin:reset -- --list` | 등록된 계정(이메일) 목록 확인 |
 | `npm run admin:reset -- --email <이메일>` | 관리자 **비밀번호 초기화** (아래 참고) |
 
