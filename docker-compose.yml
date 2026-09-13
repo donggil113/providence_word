@@ -30,6 +30,10 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        # NEXT_PUBLIC_* 는 빌드 시점에 필요하다(코드에 박힘).
+        NEXT_PUBLIC_SITE_NAME: ${NEXT_PUBLIC_SITE_NAME}
+        NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL}
     container_name: providence_web
     restart: unless-stopped
     depends_on:
@@ -49,7 +53,9 @@ services:
       # 업로드된 말씀 파일을 호스트 볼륨에 영구 저장
       - uploads:/app/uploads
     ports:
-      - "3000:3000"
+      # 서버 내부(127.0.0.1)에만 노출한다. 운영에서는 Caddy 가 앞에서 받아 넘긴다.
+      # (로컬 PC 에서는 그대로 http://localhost:3000 으로 접속된다.)
+      - "127.0.0.1:3000:3000"
 
 volumes:
   pgdata:

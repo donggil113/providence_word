@@ -101,6 +101,58 @@ npm run dev
 | `npm run db:setup-search` | pg_trgm 확장 + 검색 인덱스 생성 |
 | `npm run db:seed` | 최초 관리자 계정 생성 |
 | `npm run db:init` | 위 3개를 한 번에 |
+| `npm run db:migrate-category` | 기존 DB의 분류 enum → 테이블 **무손실 마이그레이션** |
+| `npm run db:clean-content` | 저장된 본문의 파일명/페이지 머리말·꼬리말 잔재 청소 (`--dry-run` 먼저) |
+| `npm run category:add -- --list` | 말씀 종류(분류) 목록 확인 · `--label`/`--code` 로 추가 |
+| `npm run admin:reset -- --list` | 등록된 계정(이메일) 목록 확인 |
+| `npm run admin:reset -- --email <이메일>` | 관리자 **비밀번호 초기화** (아래 참고) |
+
+> **이미 말씀이 등록된 DB가 있다면**(분류가 아직 enum 컬럼): `prisma db push` 가 리셋을
+> 요구할 수 있습니다. 데이터를 잃지 않고 옮기려면 **[docs/migrate-existing-db.md](docs/migrate-existing-db.md)**
+> 의 안내(`npm run db:migrate-category`)를 따르세요.
+
+---
+
+## 로그인 이메일·비밀번호를 잊었을 때
+
+관리자 계정은 이메일 발송 기능이 없어 "비밀번호 찾기" 메일을 보낼 수 없습니다.
+대신 **서버에 접속할 수 있는 사람**이 직접 복구합니다. (그래서 서버 접근 권한 자체가 보안 경계입니다.)
+
+```bash
+# ── docker compose 로 운영 중일 때 (Contabo 등 VPS) ──────────
+cd /경로/providence_word
+
+# 1) 어떤 이메일이 등록돼 있는지 확인
+docker compose exec web npx tsx scripts/reset-admin.ts --list
+
+# 2) 비밀번호 초기화 — 비밀번호를 생략하면 임시 비밀번호를 만들어 화면에 보여줍니다
+docker compose exec web npx tsx scripts/reset-admin.ts --email admin@providence.word.net
+
+#    직접 정하고 싶다면 (8자 이상)
+docker compose exec web npx tsx scripts/reset-admin.ts \
+  --email admin@providence.word.net --password '새로운비밀번호'
+
+# 3) 계정이 아예 하나도 없다면 새로 만들기
+docker compose exec web npx tsx scripts/reset-admin.ts \
+  --email 나의메일@example.com --name 관리자 --create
+```
+
+Docker 없이 직접 실행 중이라면 `npx tsx` 부분만 그대로, 프로젝트 폴더에서 실행하면 됩니다.
+
+```bash
+npm run admin:reset -- --list
+npm run admin:reset -- --email admin@providence.word.net
+```
+
+> ⚠️ **`npm run db:seed` 를 다시 돌려도 비밀번호는 초기화되지 않습니다.**
+> 운영 중에 실수로 비밀번호가 바뀌는 것을 막으려고, 시드는 계정이 이미 있으면
+> 비밀번호를 덮어쓰지 않도록 만들어져 있습니다. 초기화는 위 `reset-admin` 을 쓰세요.
+
+**이메일도 기억나지 않는다면** `--list` 출력에 등록된 계정이 모두 나옵니다.
+그래도 안 보이면 `.env` 의 `ADMIN_EMAIL` 값이 최초 생성에 쓰인 이메일입니다.
+
+초기화한 뒤에는 로그인 → **관리 → 계정 관리**에서 원하는 비밀번호로 바꿔 두세요.
+임시 비밀번호는 터미널 기록(`~/.bash_history`)에 남을 수 있습니다.
 
 ---
 
@@ -149,41 +201,22 @@ npx tsx scripts/import.ts  --csv data/sermons.generated.csv
 
 ---
 
-## 도메인 연결 & HTTPS
+## 서버 배포 · 도메인 연결 & HTTPS
 
-`www.providence.word.net` 같은 주소로 공개하려면, 도메인을 서버 IP 로 연결한 뒤
-앞단에 리버스 프록시(HTTPS 종료)를 두는 것을 권장합니다.
+VPS(Contabo 등)에 올려 도메인으로 공개하려면 운영용 설정을 함께 사용합니다.
+`Caddy` 리버스 프록시가 붙어 **인증서가 자동 발급·갱신**되고, 웹·DB 포트는 외부에 열리지 않습니다.
 
-### 예시: Caddy (자동 HTTPS)
-
-서버에 Caddy 를 설치하고 `Caddyfile` 을 아래처럼 작성하면 인증서가 자동 발급됩니다.
-
-```
-www.providence.word.net {
-    reverse_proxy localhost:3000
-}
-providence.word.net {
-    redir https://www.providence.word.net{uri}
-}
+```bash
+# .env 에 SITE_DOMAIN / ACME_EMAIL / NEXT_PUBLIC_SITE_URL 을 채운 뒤
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 ```
 
-### 예시: Nginx
+- DNS: 도메인의 A 레코드(`@`, `www`)를 서버 공인 IP 로 지정합니다.
+- Cloudflare 를 쓴다면 인증서 발급 전까지는 **DNS only(회색 구름)** 로 두고,
+  프록시를 켤 때는 SSL/TLS 모드를 **Full (strict)** 로 설정하세요.
 
-```nginx
-server {
-    server_name www.providence.word.net;
-    client_max_body_size 60M;   # 큰 말씀 파일 업로드 대비
-    location / {
-        proxy_pass http://localhost:3000;
-        proxy_set_header Host $host;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-}
-# 인증서는 certbot 등으로 발급 (sudo certbot --nginx -d www.providence.word.net)
-```
-
-> DNS: 도메인의 A 레코드를 서버 공인 IP 로 지정하세요.
+기존 로컬 데이터를 서버로 옮기는 것까지 포함한 전체 절차는
+**[docs/deploy-contabo.md](docs/deploy-contabo.md)** 를 따라 하시면 됩니다.
 
 ---
 

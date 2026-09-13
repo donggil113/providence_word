@@ -4,14 +4,18 @@
   "private": true,
   "description": "섭리 말씀 아카이브 - 1978년부터의 모든 말씀을 정리·검색하는 웹 사이트",
   "scripts": {
-    "dev": "next dev",
-    "build": "prisma generate && next build",
+    "dev": "node scripts/copy-pdf-worker.js && next dev",
+    "build": "prisma generate && node scripts/copy-pdf-worker.js && next build",
     "start": "next start",
     "lint": "next lint",
     "prisma:generate": "prisma generate",
     "db:push": "prisma db push",
     "db:setup-search": "tsx scripts/setup-search.ts",
     "db:seed": "tsx prisma/seed.ts",
+    "db:migrate-category": "tsx scripts/migrate-category.ts",
+    "db:clean-content": "tsx scripts/clean-content.ts",
+    "admin:reset": "tsx scripts/reset-admin.ts",
+    "category:add": "tsx scripts/add-category.ts",
     "db:init": "prisma db push && tsx scripts/setup-search.ts && tsx prisma/seed.ts",
     "analyze": "tsx scripts/analyze.ts",
     "import": "tsx scripts/import.ts"
@@ -28,6 +32,7 @@
     "jose": "^5.9.6",
     "next": "14.2.15",
     "pdf-parse": "^1.1.1",
+    "pdfjs-dist": "^4.10.38",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "zod": "^3.23.8"
