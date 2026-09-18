@@ -6,6 +6,7 @@ import PdfViewer from "./PdfViewer";
 export interface PdfFile {
   id: string;
   originalName: string;
+  generated?: boolean;
 }
 
 export default function SermonTabs({
@@ -89,6 +90,11 @@ export default function SermonTabs({
                     </button>
                   ))}
                 </div>
+              )}
+              {pdfs.find((p) => p.id === activePdf)?.generated && (
+                <p className="mb-2 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-500">
+                  이 PDF는 입력된 말씀 본문으로 자동 생성된 문서입니다. (명조체 15pt)
+                </p>
               )}
               <PdfViewer
                 key={activePdf}

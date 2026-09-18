@@ -22,6 +22,9 @@ export default async function AdminLayout({
           <Link href="/admin/new" className="rounded-lg px-3 py-1.5 hover:bg-slate-100">
             새 말씀 등록
           </Link>
+          <Link href="/admin/bulk" className="rounded-lg px-3 py-1.5 hover:bg-slate-100">
+            한번에 등록
+          </Link>
           {user.role === "ADMIN" && (
             <Link href="/admin/categories" className="rounded-lg px-3 py-1.5 hover:bg-slate-100">
               분류 관리

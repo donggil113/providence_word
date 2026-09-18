@@ -51,45 +51,29 @@ import os from "os";
 import crypto from "crypto";
 import { execFile } from "child_process";
 import { PrismaClient } from "@prisma/client";
+import {
+  CATEGORY_HINTS,
+  buildCategoryRules as buildRules,
+  dateFromFilenameHead,
+  findDate,
+  ruleCategory as ruleCategoryWith,
+  titleFromFilename,
+  type CategoryRule,
+} from "../src/lib/filename-rules";
 import { extractContent } from "../src/lib/extract";
 
 // ── 분류(카테고리) 키워드 규칙 ───────────────────────────────
 // 파일명/상위 폴더명에 포함된 키워드로 분류를 판정한다.
-// 여기에 없는 분류(예: 교역자/교육)는 import.ts 가 자동으로 새 분류로 만든다.
+// 규칙은 src/lib/filename-rules.ts 한 곳에만 두고, 웹의 [한번에 등록] 화면과 공유한다.
 // (관리자 페이지에서 추가한 사용자 정의 분류는 실행 시 DB에서 읽어 규칙에 합쳐짐)
-const CATEGORIES: { code: string; label: string; hints: string[] }[] = [
-  { code: "SUNDAY", label: "주일말씀", hints: ["주일말씀", "주일예배", "주일"] },
-  { code: "WEDNESDAY", label: "수요말씀", hints: ["수요말씀", "수요예배", "수요"] },
-  { code: "DAWN", label: "새벽말씀", hints: ["새벽말씀", "새벽예배", "새벽기도", "새벽"] },
-  { code: "FRIDAY_PRAYER", label: "금요기도회", hints: ["금요기도회", "금요기도", "금요철야", "금요", "철야"] },
-  { code: "HOLY_SPIRIT_MEETING", label: "성령집회 말씀", hints: ["성령집회", "부흥회", "사경회", "집회"] },
-  { code: "DEPARTMENT", label: "부서 말씀", hints: ["부서", "청년부", "학생부", "중고등부", "중등부", "고등부", "유년부", "유치부", "영아부", "장년부", "대학부", "여전도회", "남전도회", "주일학교"] },
-  { code: "SPECIAL", label: "특별 말씀", hints: ["특별집회", "특별새벽", "특별", "신년", "송구영신", "부활절", "맥추", "성탄", "추수감사", "임직", "헌신예배", "창립"] },
-  { code: "HOLY_SPIRIT_STORY", label: "성령사연", hints: ["성령사연", "사연", "간증"] },
-  { code: "BIBLE_SCHOOL", label: "성경학교", hints: ["여름성경학교", "겨울성경학교", "성경학교"] },
-  { code: "THEOLOGY", label: "신학", hints: ["신학", "교리", "세미나", "강좌"] },
-  // 사용자가 예로 든 분류 (import 시 자동 생성됨)
-  { code: "PASTORAL", label: "교역자 말씀", hints: ["교역자", "사역자", "임직자"] },
-  { code: "EDUCATION", label: "교육 말씀", hints: ["교육", "양육", "제자훈련", "훈련"] },
-  { code: "ETC", label: "기타 말씀", hints: [] },
-];
-// LLM 출력 enum 에 쓰는 코드 목록(ETC 포함, 규칙 외 분류도 허용)
-const CATEGORY_CODES = CATEGORIES.map((c) => c.code);
+// 분류 코드 목록(LLM 출력 enum 용).
+const CATEGORY_CODES = CATEGORY_HINTS.map((c) => c.code);
 
-// 런타임에 (CATEGORIES + DB 분류 라벨) 을 합쳐 만든 키워드 규칙.
-// 더 긴(구체적인) 키워드가 먼저 매칭되도록 정렬한다.
-let CATEGORY_RULES: { keyword: string; code: string }[] = [];
+// 런타임에 (기본 힌트 + DB 분류 라벨) 을 합쳐 만든 키워드 규칙.
+// 규칙 자체는 src/lib/filename-rules.ts 에 있다 — 웹의 [한번에 등록] 화면과 같은 규칙을 쓴다.
+let CATEGORY_RULES: CategoryRule[] = [];
 function buildCategoryRules(dbCats: { code: string; label: string }[]) {
-  const rules: { keyword: string; code: string }[] = [];
-  for (const c of CATEGORIES) for (const h of c.hints) rules.push({ keyword: h, code: c.code });
-  // DB 분류: 라벨에서 '말씀/예배' 등 접미사를 떼고 키워드로 추가
-  for (const c of dbCats) {
-    const kw = c.label.replace(/\s*(말씀|예배|집회)\s*$/g, "").trim();
-    if (kw) rules.push({ keyword: kw, code: c.code });
-    rules.push({ keyword: c.label.trim(), code: c.code });
-  }
-  rules.sort((a, b) => b.keyword.length - a.keyword.length);
-  CATEGORY_RULES = rules;
+  CATEGORY_RULES = buildRules(dbCats);
 }
 
 // ── CLI 인자 파싱 ────────────────────────────────────────────
@@ -159,75 +143,7 @@ async function hasTool(tool: string): Promise<boolean> {
   return ok;
 }
 
-// ── 날짜 파싱 (파일명/본문에서) ──────────────────────────────
-function normalizeDate(y: number, m: number, d: number): string | null {
-  if (y < 1900 || y > 2100) return null;
-  if (m < 1 || m > 12) return null;
-  if (d < 1 || d > 31) return null;
-  const mm = String(m).padStart(2, "0");
-  const dd = String(d).padStart(2, "0");
-  return `${y}-${mm}-${dd}`;
-}
-// 2자리 연도 → 4자리 (교단 시작 1978년 기준: 78~99 → 19xx, 00~77 → 20xx)
-function expandYear2(yy: number): number {
-  return yy >= 78 ? 1900 + yy : 2000 + yy;
-}
-
-// 파일명 '앞부분'의 숫자(YYYYMMDD 또는 YYMMDD)에서 날짜 추출 — 1순위 규칙
-function dateFromFilenameHead(baseName: string): string | null {
-  const head = baseName.replace(/^[\s_\-.]+/, "");
-  // 8자리: YYYYMMDD
-  let m = head.match(/^(\d{4})(\d{2})(\d{2})(?:\D|$)/);
-  if (m) {
-    const r = normalizeDate(parseInt(m[1]), parseInt(m[2]), parseInt(m[3]));
-    if (r) return r;
-  }
-  // 구분자 있는 앞부분: YYYY-MM-DD 류
-  m = head.match(/^(\d{4})[._\-]?(\d{1,2})[._\-]?(\d{1,2})(?:\D|$)/);
-  if (m && m[1].length === 4) {
-    const r = normalizeDate(parseInt(m[1]), parseInt(m[2]), parseInt(m[3]));
-    if (r) return r;
-  }
-  // 6자리: YYMMDD
-  m = head.match(/^(\d{2})(\d{2})(\d{2})(?:\D|$)/);
-  if (m) {
-    const r = normalizeDate(expandYear2(parseInt(m[1])), parseInt(m[2]), parseInt(m[3]));
-    if (r) return r;
-  }
-  return null;
-}
-
-// 일반 텍스트(본문/파일명 전체)에서 날짜 추출 — 보조
-function findDate(text: string): string | null {
-  if (!text) return null;
-  let m = text.match(/(19|20)(\d{2})[._\-\/](\d{1,2})[._\-\/](\d{1,2})/);
-  if (m) {
-    const r = normalizeDate(parseInt(m[1] + m[2]), parseInt(m[3]), parseInt(m[4]));
-    if (r) return r;
-  }
-  m = text.match(/(?<!\d)(19|20)(\d{2})(\d{2})(\d{2})(?!\d)/);
-  if (m) {
-    const r = normalizeDate(parseInt(m[1] + m[2]), parseInt(m[3]), parseInt(m[4]));
-    if (r) return r;
-  }
-  m = text.match(/(\d{4})\s*년\s*(\d{1,2})\s*월\s*(\d{1,2})\s*일/);
-  if (m) {
-    const r = normalizeDate(parseInt(m[1]), parseInt(m[2]), parseInt(m[3]));
-    if (r) return r;
-  }
-  return null;
-}
-
-// ── 규칙 기반 분류 ───────────────────────────────────────────
-// 파일명 + 상위 폴더명에서 키워드로 판정 (CATEGORY_RULES, 긴 키워드 우선)
-function ruleCategory(haystack: string): { code: string; matched: boolean } {
-  for (const r of CATEGORY_RULES) {
-    if (r.keyword && haystack.includes(r.keyword)) {
-      return { code: r.code, matched: true };
-    }
-  }
-  return { code: "ETC", matched: false };
-}
+// 날짜 파싱·분류 판정 규칙은 src/lib/filename-rules.ts 를 사용한다.
 
 // 규칙 기반 메타데이터 추출 (AI 호출 없음)
 function heuristicMeta(fileName: string, parentDir: string, text: string): Meta {
@@ -256,7 +172,7 @@ function heuristicMeta(fileName: string, parentDir: string, text: string): Meta 
   }
 
   // 2) 분류: 파일명 + 상위 폴더명 키워드 (폴더명을 함께 본다)
-  const cat = ruleCategory(`${folder} ${baseName}`);
+  const cat = ruleCategoryWith(`${folder} ${baseName}`, CATEGORY_RULES);
 
   // 3) 성경본문: 본문 텍스트에서 규칙 추출 (예: "요한복음 3:16")
   let scripture = "";
@@ -264,13 +180,7 @@ function heuristicMeta(fileName: string, parentDir: string, text: string): Meta 
   if (sm) scripture = sm[0].replace(/\s+/g, " ").trim();
 
   // 4) 제목: 파일명에서 날짜·분류 키워드 제거한 나머지
-  let title = baseName.replace(/^[\s_\-.]*\d{4,8}([._\-]\d{1,2}){0,2}[\s_\-.]*/, " "); // 앞 날짜(YYMMDD/YYYYMMDD 등) 제거
-  title = title.replace(/(19|20)\d{2}[._\-]?\d{1,2}[._\-]?\d{1,2}/g, " "); // 기타 날짜 제거
-  for (const r of CATEGORY_RULES) {
-    if (r.keyword) title = title.split(r.keyword).join(" ");
-  }
-  title = title.replace(/[_\-]+/g, " ").replace(/\s+/g, " ").trim();
-  if (!title) title = baseName.replace(/[_\-]+/g, " ").trim() || baseName;
+  const title = titleFromFilename(baseName, CATEGORY_RULES);
 
   // 5) 설교자·요약 등 AI 필요한 항목은 비워둔다.
 
@@ -326,7 +236,7 @@ const SYSTEM_PROMPT = `당신은 한국 교회의 설교/말씀 자료를 정리
 
 규칙:
 - category(말씀 종류)는 반드시 다음 코드 중 하나입니다:
-${CATEGORIES.map((c) => `  - ${c.code}: ${c.label}`).join("\n")}
+${CATEGORY_HINTS.map((c) => `  - ${c.code}: ${c.label}`).join("\n")}
 - 날짜(preachedAt): 파일명에 날짜가 있으면 그것을 우선 사용(dateSource="filename"),
   없으면 본문에서 찾고(dateSource="body"), 둘 다 없으면 빈 문자열 + dateSource="none".
   형식은 반드시 YYYY-MM-DD. 연도만 있으면 그 해 1월 1일로 추정하지 말고 빈 문자열로 두세요.

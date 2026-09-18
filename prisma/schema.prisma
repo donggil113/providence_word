@@ -78,6 +78,7 @@ model SermonFile {
   kind         FileKind                    // 파일 종류
   mimeType     String
   size         Int                         // 바이트
+  generated    Boolean  @default(false)    // 본문 텍스트로 자동 생성한 PDF 인지
   createdAt    DateTime @default(now())
 
   @@index([sermonId])

@@ -1,9 +1,10 @@
 # 섭리 말씀 아카이브 - 웹 애플리케이션 이미지
 FROM node:22-bookworm-slim AS base
 
-# Prisma 가 필요로 하는 openssl, 그리고 ca-certificates 설치
+# Prisma 가 필요로 하는 openssl, ca-certificates,
+# 그리고 본문 텍스트로 PDF 를 만들 때 쓰는 한글 명조 글꼴(나눔명조, OFL)
 RUN apt-get update -y \
-  && apt-get install -y --no-install-recommends openssl ca-certificates \
+  && apt-get install -y --no-install-recommends openssl ca-certificates fonts-nanum \
   && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
