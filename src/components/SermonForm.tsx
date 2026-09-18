@@ -23,7 +23,12 @@ export interface SermonInitial {
   summary?: string | null;
   preachedAt?: string; // YYYY-MM-DD
   files?: ExistingFile[];
+  contentText?: string | null; // 편집기에 실을 본문(너무 길면 서버에서 비워서 내려보냄)
+  contentTooLong?: boolean; // 본문이 너무 길어 편집기에 싣지 않은 경우
 }
+
+// 본문 직접 입력 최대 길이 (서버와 동일)
+const MAX_BODY_CHARS = 500_000;
 
 export default function SermonForm({
   initial,
@@ -45,6 +50,8 @@ export default function SermonForm({
   const [department, setDepartment] = useState(initial?.department || "");
   const [eventName, setEventName] = useState(initial?.eventName || "");
   const [summary, setSummary] = useState(initial?.summary || "");
+  const [contentText, setContentText] = useState(initial?.contentText || "");
+  const [bodyTouched, setBodyTouched] = useState(false);
   const [newFiles, setNewFiles] = useState<File[]>([]);
   const [deleteFileIds, setDeleteFileIds] = useState<string[]>([]);
 
@@ -62,8 +69,24 @@ export default function SermonForm({
     setError("");
     if (!title.trim()) return setError("제목을 입력하세요.");
     if (!preachedAt) return setError("선포일을 입력하세요.");
+    if (!isEdit && !contentText.trim() && newFiles.length === 0) {
+      return setError("말씀 본문을 입력하거나 파일을 첨부하세요.");
+    }
+    if (contentText.length > MAX_BODY_CHARS) {
+      return setError(`본문이 너무 깁니다. (최대 ${MAX_BODY_CHARS.toLocaleString()}자)`);
+    }
+
+    // 본문 처리 방식을 서버에 알려준다.
+    //   manual : 편집기의 본문을 그대로 저장
+    //   keep   : 본문이 길어 편집기에 싣지 않았고 건드리지도 않음 → 기존 본문 유지
+    //   files  : 첨부 파일에서 다시 추출 (본문을 비운 경우)
+    let contentMode: "manual" | "keep" | "files" = "manual";
+    if (isEdit && initial?.contentTooLong && !bodyTouched) contentMode = "keep";
+    else if (isEdit && !contentText.trim() && !bodyTouched) contentMode = "files";
 
     const fd = new FormData();
+    fd.set("contentMode", contentMode);
+    fd.set("contentText", contentText);
     fd.set("title", title);
     fd.set("category", category);
     fd.set("preachedAt", preachedAt);
@@ -186,6 +209,48 @@ export default function SermonForm({
         />
       </div>
 
+      {/* 본문 직접 입력 */}
+      <div>
+        <label className={labelCls}>말씀 본문 (직접 입력)</label>
+        {initial?.contentTooLong && !bodyTouched ? (
+          <div className="mt-1 rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+            본문이 너무 길어 편집기에 불러오지 않았습니다. 그대로 두면 기존 본문이 유지됩니다.
+            <button
+              type="button"
+              onClick={() => setBodyTouched(true)}
+              className="ml-2 font-medium text-brand-700 underline"
+            >
+              그래도 직접 편집하기
+            </button>
+          </div>
+        ) : (
+          <>
+            <textarea
+              value={contentText}
+              onChange={(e) => {
+                setContentText(e.target.value);
+                setBodyTouched(true);
+              }}
+              rows={14}
+              className={`mt-1 font-mono text-[13px] leading-relaxed ${inputCls}`}
+              placeholder={
+                "파일 없이 말씀 본문을 여기에 붙여넣거나 입력하세요.\n\n" +
+                "· 입력한 본문은 그대로 검색 대상이 됩니다.\n" +
+                "· PDF 원문을 첨부하지 않으면, 이 본문으로 명조체 PDF가 자동 생성되어\n" +
+                "  다른 말씀들과 똑같이 'PDF 원문 보기' 탭에서 볼 수 있습니다."
+              }
+            />
+            <p className="mt-1 flex flex-wrap gap-x-3 text-xs text-slate-400">
+              <span>{contentText.length.toLocaleString()}자</span>
+              <span>· 빈 줄로 문단을 나누면 PDF에서도 문단이 유지됩니다.</span>
+              {isEdit && bodyTouched && (
+                <span className="text-amber-600">· 저장하면 기존 본문을 덮어씁니다.</span>
+              )}
+            </p>
+          </>
+        )}
+      </div>
+
       {/* 기존 파일 (수정 모드) */}
       {isEdit && initial?.files && initial.files.length > 0 && (
         <div>
@@ -223,7 +288,7 @@ export default function SermonForm({
 
       <div>
         <label className={labelCls}>
-          {isEdit ? "파일 추가" : "말씀 파일 첨부"} (txt, pdf, hwp — 여러 개 가능)
+          {isEdit ? "파일 추가" : "말씀 파일 첨부"} (txt, pdf, hwp — 여러 개 가능, 선택)
         </label>
         <input
           type="file"

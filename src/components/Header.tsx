@@ -42,6 +42,12 @@ export default function Header({
             >
               말씀 검색
             </Link>
+            <Link
+              href="/calendar"
+              className="px-2 py-1.5 rounded hover:bg-white/10 transition"
+            >
+              달력
+            </Link>
             {user ? (
               <>
                 <Link

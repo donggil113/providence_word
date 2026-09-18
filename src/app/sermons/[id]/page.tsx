@@ -102,7 +102,14 @@ export default async function SermonDetailPage({
                     {FILE_KIND_LABELS[f.kind]}
                   </span>
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm text-slate-800">{f.originalName}</p>
+                    <p className="truncate text-sm text-slate-800">
+                      {f.originalName}
+                      {f.generated && (
+                        <span className="ml-1.5 rounded bg-brand-50 px-1.5 py-0.5 text-[11px] font-medium text-brand-700">
+                          자동 생성
+                        </span>
+                      )}
+                    </p>
                     <p className="text-xs text-slate-400">{formatBytes(f.size)}</p>
                   </div>
                   <div className="flex gap-2 shrink-0">
@@ -132,7 +139,11 @@ export default async function SermonDetailPage({
           contentText={sermon.contentText}
           pdfs={sermon.files
             .filter((f) => f.kind === "PDF")
-            .map((f) => ({ id: f.id, originalName: f.originalName }))}
+            .map((f) => ({
+              id: f.id,
+              originalName: f.originalName,
+              generated: f.generated,
+            }))}
         />
 
         {/* 관리자/편집자 액션 */}

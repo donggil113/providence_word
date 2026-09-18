@@ -12,12 +12,19 @@
 - **말씀 종류별 분류** — 기본 11종(주일·수요·새벽·금요기도회·성령집회·부서·특별·기타·성령사연·성경학교·신학)
   외에 **관리자가 직접 분류를 추가·수정** (관리 → 분류 관리)
 - **시간 순 정리** — 연도별 보기, 최신순/오래된순 정렬
+- **말씀 달력 + 누락 점검** — 1년치를 달력으로 펼쳐 말씀이 있는 날/없는 날을 한눈에 확인.
+  **‘빠진 날 찾기’** 로 “1978~2026년 모든 주일 중 주일말씀이 없는 날”처럼
+  **요일·분류별 누락을 한 번에** 찾고, 업로드 누락인지 분류 오류인지까지 구분
 - **강력한 검색** — 제목·성경본문·설교자·행사명·부서, 그리고 **txt/pdf 본문 내용**까지 검색
 - **기간 선택** — 특정 기간 내에 선포된 말씀만 모아보기
 - **말씀 상세 보기** — **‘말씀 내용 보기’ 탭**(추출 본문)과 **‘PDF 원문 보기’ 탭**(원문 PDF를 브라우저에서 바로 표시)
 - **다양한 파일 지원** — `txt`, `pdf`, `hwp(hwpx)` 업로드 및 보기/다운로드
 - **모바일·데스크톱 모두 지원** — 반응형 디자인
 - **매주 손쉬운 추가** — 로그인한 관리자/편집자가 관리자 페이지에서 말씀 등록
+- **여러 말씀 한번에 등록** — 파일 여러 개를 한꺼번에 올리고 표에서 종류를 지정해 일괄 등록.
+  파일명에서 **날짜·제목·말씀 종류를 자동으로 채움**(전체에 같은 분류를 한 번에 적용도 가능)
+- **파일 없이 텍스트만으로 등록** — 본문을 붙여넣어 등록할 수 있고, 이 본문은
+  **명조체 15pt PDF 로 자동 생성**되어 다른 말씀들과 똑같이 ‘PDF 원문 보기’ 탭에서 읽힘
 - **말씀 일괄 관리** — 관리 목록에서 제목·날짜·성경본문·설교자 **인라인 수정**,
   분류 **드롭다운 변경**, 여러 건 **체크 후 일괄 재분류**(현재 필터 전체 이동 포함),
   ‘검토필요’·‘기타(ETC)’만 모아보는 필터. (‘기타’로 잘못 분류된 대량 자료를 빠르게 재분류)
@@ -101,6 +108,58 @@ npm run dev
 | `npm run db:setup-search` | pg_trgm 확장 + 검색 인덱스 생성 |
 | `npm run db:seed` | 최초 관리자 계정 생성 |
 | `npm run db:init` | 위 3개를 한 번에 |
+| `npm run db:migrate-category` | 기존 DB의 분류 enum → 테이블 **무손실 마이그레이션** |
+| `npm run db:clean-content` | 저장된 본문의 파일명/페이지 머리말·꼬리말 잔재 청소 (`--dry-run` 먼저) |
+| `npm run category:add -- --list` | 말씀 종류(분류) 목록 확인 · `--label`/`--code` 로 추가 |
+| `npm run admin:reset -- --list` | 등록된 계정(이메일) 목록 확인 |
+| `npm run admin:reset -- --email <이메일>` | 관리자 **비밀번호 초기화** (아래 참고) |
+
+> **이미 말씀이 등록된 DB가 있다면**(분류가 아직 enum 컬럼): `prisma db push` 가 리셋을
+> 요구할 수 있습니다. 데이터를 잃지 않고 옮기려면 **[docs/migrate-existing-db.md](docs/migrate-existing-db.md)**
+> 의 안내(`npm run db:migrate-category`)를 따르세요.
+
+---
+
+## 로그인 이메일·비밀번호를 잊었을 때
+
+관리자 계정은 이메일 발송 기능이 없어 "비밀번호 찾기" 메일을 보낼 수 없습니다.
+대신 **서버에 접속할 수 있는 사람**이 직접 복구합니다. (그래서 서버 접근 권한 자체가 보안 경계입니다.)
+
+```bash
+# ── docker compose 로 운영 중일 때 (Contabo 등 VPS) ──────────
+cd /경로/providence_word
+
+# 1) 어떤 이메일이 등록돼 있는지 확인
+docker compose exec web npx tsx scripts/reset-admin.ts --list
+
+# 2) 비밀번호 초기화 — 비밀번호를 생략하면 임시 비밀번호를 만들어 화면에 보여줍니다
+docker compose exec web npx tsx scripts/reset-admin.ts --email admin@providence.word.net
+
+#    직접 정하고 싶다면 (8자 이상)
+docker compose exec web npx tsx scripts/reset-admin.ts \
+  --email admin@providence.word.net --password '새로운비밀번호'
+
+# 3) 계정이 아예 하나도 없다면 새로 만들기
+docker compose exec web npx tsx scripts/reset-admin.ts \
+  --email 나의메일@example.com --name 관리자 --create
+```
+
+Docker 없이 직접 실행 중이라면 `npx tsx` 부분만 그대로, 프로젝트 폴더에서 실행하면 됩니다.
+
+```bash
+npm run admin:reset -- --list
+npm run admin:reset -- --email admin@providence.word.net
+```
+
+> ⚠️ **`npm run db:seed` 를 다시 돌려도 비밀번호는 초기화되지 않습니다.**
+> 운영 중에 실수로 비밀번호가 바뀌는 것을 막으려고, 시드는 계정이 이미 있으면
+> 비밀번호를 덮어쓰지 않도록 만들어져 있습니다. 초기화는 위 `reset-admin` 을 쓰세요.
+
+**이메일도 기억나지 않는다면** `--list` 출력에 등록된 계정이 모두 나옵니다.
+그래도 안 보이면 `.env` 의 `ADMIN_EMAIL` 값이 최초 생성에 쓰인 이메일입니다.
+
+초기화한 뒤에는 로그인 → **관리 → 계정 관리**에서 원하는 비밀번호로 바꿔 두세요.
+임시 비밀번호는 터미널 기록(`~/.bash_history`)에 남을 수 있습니다.
 
 ---
 
@@ -113,6 +172,43 @@ npm run dev
    - `txt`·`pdf` 파일은 **본문 내용이 자동 추출**되어 검색에 포함됩니다.
    - `hwp` 는 신뢰할 수 있는 자동 추출이 어려워 제목·요약 등 입력 정보로 검색됩니다.
 5. **등록**을 누르면 끝. 시간 순서에 맞게 자동 정리됩니다.
+
+### 여러 말씀을 한번에 등록하기
+
+**관리 → 한번에 등록** 에서 파일 여러 개를 한꺼번에 올릴 수 있습니다.
+
+1. 파일을 여러 개 선택합니다. (pdf·txt·hwp, 파일당 최대 50MB)
+2. 파일명에서 **선포일·제목·말씀 종류가 자동으로 채워진 표**가 나옵니다.
+   - 날짜: 파일명 앞의 숫자 — `20260906…` (YYYYMMDD) 또는 `260906…` (YYMMDD)
+   - 종류: 파일명·폴더명의 키워드 — `주일말씀`, `수요`, `청년부`, `성령집회` 등
+     (관리자가 추가한 분류도 이름으로 인식합니다)
+   - 제목: 파일명에서 날짜·종류 키워드를 뺀 나머지
+3. 자동으로 못 잡은 칸은 **노란색**으로 표시됩니다. 표에서 바로 고치면 됩니다.
+4. 전부 같은 종류라면 위쪽에서 종류를 고르고 **[전체에 이 분류 적용]** 한 번이면 됩니다.
+5. **[N개 등록]** — 한 개씩 차례로 올라가며 진행 상황이 표시됩니다.
+   실패한 항목은 목록에 남으므로, 고쳐서 다시 누르면 아직 안 올라간 것만 등록됩니다.
+
+### 파일 없이 텍스트만으로 등록하기
+
+**새 말씀 등록** 화면의 **‘말씀 본문 (직접 입력)’** 칸에 본문을 붙여넣으면 파일 없이 등록됩니다.
+
+- 입력한 본문은 그대로 **검색 대상**이 됩니다.
+- PDF 원문을 첨부하지 않으면, 이 본문으로 **명조체 15pt PDF 가 자동 생성**되어
+  다른 말씀들과 똑같이 **‘PDF 원문 보기’ 탭**에서 읽고 내려받을 수 있습니다.
+  (첨부 목록에 `자동 생성` 표시가 붙습니다)
+- 나중에 본문·제목·날짜를 수정하면 **PDF 도 자동으로 다시 만들어집니다.**
+- 이미 PDF 를 첨부한 말씀은 그 PDF 가 원문이므로 자동 생성하지 않습니다.
+
+> **글꼴**: 기본값은 이미지에 포함된 **나눔명조(NanumMyeongjo)** 입니다. 자유롭게
+> 재배포할 수 있는 OFL 글꼴이라 서버에 기본 포함했습니다. **HY견명조** 처럼 다른
+> 글꼴을 쓸 권리가 있다면 그 `.ttf` 파일을 서버에 두고 컨테이너에 연결한 뒤
+> `.env` 에 `SERMON_PDF_FONT=/app/fonts/HYSMyeongJo.ttf` 를 지정하면 그 글꼴로 만들어집니다.
+>
+> ```yaml
+> # docker-compose.yml 의 web 서비스에 추가
+> volumes:
+>   - ./fonts:/app/fonts:ro
+> ```
 
 ---
 
@@ -149,41 +245,22 @@ npx tsx scripts/import.ts  --csv data/sermons.generated.csv
 
 ---
 
-## 도메인 연결 & HTTPS
+## 서버 배포 · 도메인 연결 & HTTPS
 
-`www.providence.word.net` 같은 주소로 공개하려면, 도메인을 서버 IP 로 연결한 뒤
-앞단에 리버스 프록시(HTTPS 종료)를 두는 것을 권장합니다.
+VPS(Contabo 등)에 올려 도메인으로 공개하려면 운영용 설정을 함께 사용합니다.
+`Caddy` 리버스 프록시가 붙어 **인증서가 자동 발급·갱신**되고, 웹·DB 포트는 외부에 열리지 않습니다.
 
-### 예시: Caddy (자동 HTTPS)
-
-서버에 Caddy 를 설치하고 `Caddyfile` 을 아래처럼 작성하면 인증서가 자동 발급됩니다.
-
-```
-www.providence.word.net {
-    reverse_proxy localhost:3000
-}
-providence.word.net {
-    redir https://www.providence.word.net{uri}
-}
+```bash
+# .env 에 SITE_DOMAIN / ACME_EMAIL / NEXT_PUBLIC_SITE_URL 을 채운 뒤
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 ```
 
-### 예시: Nginx
+- DNS: 도메인의 A 레코드(`@`, `www`)를 서버 공인 IP 로 지정합니다.
+- Cloudflare 를 쓴다면 인증서 발급 전까지는 **DNS only(회색 구름)** 로 두고,
+  프록시를 켤 때는 SSL/TLS 모드를 **Full (strict)** 로 설정하세요.
 
-```nginx
-server {
-    server_name www.providence.word.net;
-    client_max_body_size 60M;   # 큰 말씀 파일 업로드 대비
-    location / {
-        proxy_pass http://localhost:3000;
-        proxy_set_header Host $host;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-}
-# 인증서는 certbot 등으로 발급 (sudo certbot --nginx -d www.providence.word.net)
-```
-
-> DNS: 도메인의 A 레코드를 서버 공인 IP 로 지정하세요.
+기존 로컬 데이터를 서버로 옮기는 것까지 포함한 전체 절차는
+**[docs/deploy-contabo.md](docs/deploy-contabo.md)** 를 따라 하시면 됩니다.
 
 ---
 

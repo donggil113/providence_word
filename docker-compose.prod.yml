@@ -1,0 +1,32 @@
+# 섭리 말씀 아카이브 - 운영 서버(Contabo 등 VPS) 추가 설정
+#
+# 기본 docker-compose.yml 위에 겹쳐서 사용한다:
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+#
+# 하는 일:
+#   - Caddy 리버스 프록시를 붙여 도메인 연결 + HTTPS 자동 발급
+#   - 외부에는 80/443 만 열고, 웹(3000)·DB(5432)는 서버 내부에서만 접근
+#
+services:
+  caddy:
+    image: caddy:2-alpine
+    container_name: providence_caddy
+    restart: unless-stopped
+    depends_on:
+      - web
+    environment:
+      SITE_DOMAIN: ${SITE_DOMAIN}
+      ACME_EMAIL: ${ACME_EMAIL}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # 발급받은 인증서를 보존한다(재시작해도 재발급하지 않도록).
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  caddy_data:
+  caddy_config:

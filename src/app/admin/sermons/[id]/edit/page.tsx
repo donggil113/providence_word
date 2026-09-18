@@ -25,7 +25,14 @@ export default async function EditSermonPage({
   ]);
   if (!sermon) notFound();
 
+  // 아주 긴 본문은 브라우저 편집기에 싣지 않는다(느려짐 방지). 이 경우 저장해도 본문은 유지된다.
+  const EDITABLE_BODY_LIMIT = 50_000;
+  const body = sermon.contentText || "";
+  const contentTooLong = body.length > EDITABLE_BODY_LIMIT;
+
   const initial: SermonInitial = {
+    contentText: contentTooLong ? "" : body,
+    contentTooLong,
     id: sermon.id,
     title: sermon.title,
     category: sermon.category?.code,
